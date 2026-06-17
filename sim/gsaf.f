@@ -9,6 +9,7 @@ rtl/gf_modexp_engine.sv
 rtl/gf_modinv_engine.sv
 rtl/gf_pqc_engine.sv
 rtl/gf_rsa_crt_engine.sv
+rtl/gf_ecc_engine.sv
 rtl/gf_microcode_rom.sv
 rtl/gf_operand_banks.sv
 rtl/gf_transaction_table.sv
