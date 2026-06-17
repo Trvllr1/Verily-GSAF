@@ -93,6 +93,12 @@ def get_opcode(name):
     opcodes = {
         "modexp": 0x0,
         "modinv": 0x1,
+        "ecc_padd": 0x8,
+        "ecc_pdbl": 0x9,
+        "ecc_x25519": 0xB,
+        "rsa_crt": 0xC,
         "pqc": 0xD,
+        "pqc_fwd_ntt": 0xE,
+        "pqc_inv_ntt": 0xF,
     }
     return opcodes.get(name, 0x0)

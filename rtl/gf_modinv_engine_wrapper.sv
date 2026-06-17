@@ -20,7 +20,7 @@ module gf_modinv_engine_wrapper
   input  logic rst_ni,
 
   // Engine interface (chassis side)
-  gf_engine_if.chassis_mp engine_if
+  gf_engine_if.engine_mp engine_if
 );
 
   // ─── Engine instantiation ────────────────────────────────────────────────

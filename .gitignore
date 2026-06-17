@@ -47,3 +47,8 @@ desktop.ini
 *.swp
 *.swo
 *~
+.venv/
+sim_build/
+__pycache__/
+*.pyc
+licenses/

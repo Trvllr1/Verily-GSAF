@@ -30,8 +30,8 @@ def build(
     console.print(Panel(f"Building GSAF for {target} ({part})", style="bold blue"))
     
     # Check if Vivado is available
-    rc, _, _ = subprocess.run("which vivado", shell=True, capture_output=True)
-    if rc != 0:
+    result = subprocess.run("which vivado", shell=True, capture_output=True)
+    if result.returncode != 0:
         console.print("[red]Error: Vivado not found in PATH[/red]")
         console.print("Please install Xilinx Vivado and add to PATH")
         raise typer.Exit(1)

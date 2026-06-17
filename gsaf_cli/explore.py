@@ -8,8 +8,8 @@ app = typer.Typer(help="List RTL modules and interfaces")
 console = Console()
 
 
-@app.command()
-def main(
+@app.command(name="main")
+def explore(
     module: str = typer.Option(None, "--module", "-m", help="Specific module to explore"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detailed info"),
 ):

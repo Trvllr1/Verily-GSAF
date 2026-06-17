@@ -1,6 +1,9 @@
 # cocotb testbench Makefile for GSAF
 # Run from tb/ directory: make SIM=verilator
 
+PYTHON ?= python
+COCOTB_CONFIG ?= cocotb-config
+
 # Simulator selection
 SIM ?= verilator
 
@@ -35,7 +38,7 @@ TOPLEVEL_LANG = verilog
 INCLUDE_DIRS = ../rtl ../tb
 
 # cocotb makefile
-include $(shell python -c "import cocotb; print(cocotb.__file__.replace('__init__.py', 'share/cocotb/Makefile'))")
+include $(shell $(COCOTB_CONFIG) --makefiles)/Makefile.sim
 
 .PHONY: test clean
 

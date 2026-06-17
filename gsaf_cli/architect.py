@@ -8,8 +8,8 @@ app = typer.Typer(help="Validate architecture constraints")
 console = Console()
 
 
-@app.command()
-def main(
+@app.command(name="main")
+def architect(
     width: int = typer.Option(64, "--width", "-w", help="Data path width"),
     banks: int = typer.Option(4, "--banks", "-b", help="Number of operand banks"),
     multipliers: int = typer.Option(1, "--multipliers", "-m", help="Number of multiplier lanes"),

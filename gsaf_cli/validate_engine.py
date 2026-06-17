@@ -119,7 +119,13 @@ rtl/gf_pkg.sv
     # Step 4: Simulation tests (optional)
     if not skip_sim:
         console.print("\n[bold]Step 4: Simulation Tests[/bold]")
-        rc, stdout, stderr = run_cmd("make sim 2>&1", cwd="tb/dynos")
+        dyno_targets = {
+            "modexp": "test-modexp", "modinv": "test-modinv",
+            "pqc": "test-pqc", "rsa_crt": "test-rsa-crt", "ecc": "test-ecc",
+        }
+        stem = engine_path.stem.replace("gf_", "").replace("_engine", "")
+        target = dyno_targets.get(stem, "test-all")
+        rc, stdout, stderr = run_cmd(f"make {target} 2>&1", cwd="tb/dynos")
         if rc == 0:
             console.print("[green]  PASS: Simulation tests[/green]")
             results.append(("Simulation Tests", "PASS"))
