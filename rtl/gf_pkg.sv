@@ -39,7 +39,10 @@ package gf_pkg;
     OP_ED25519     = 4'hA,
     OP_X25519      = 4'hB,
     OP_RSA_CRT     = 4'hC,
-    OP_PQC         = 4'hD
+    OP_PQC         = 4'hD,  // PQC engine (NTT butterfly array)
+    // -- PQC sub-opcodes (decoded by gf_pqc_engine) --
+    OP_PQC_FWD_NTT = 4'hE,  // Forward NTT (Cooley-Tukey)
+    OP_PQC_INV_NTT = 4'hF   // Inverse NTT (Gentleman-Sande)
   } gf_opcode_e;
 
   // ---------------------------------------------------------------------------

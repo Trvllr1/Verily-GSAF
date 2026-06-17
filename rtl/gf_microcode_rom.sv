@@ -21,7 +21,11 @@ module gf_microcode_rom
     unique case (opcode_i)
       OP_MODEXP: begin legal_o = 1'b1; engine_class_o = 2'd0; end
       OP_MODINV: begin legal_o = 1'b1; engine_class_o = 2'd1; end
-      // OP_ECC_PADD/PDBL, OP_ED25519, OP_X25519, OP_RSA_CRT, OP_PQC:
+      // PQC engine: forward/inverse NTT and base multiplication
+      OP_PQC:         begin legal_o = 1'b1; engine_class_o = 2'd2; end
+      OP_PQC_FWD_NTT: begin legal_o = 1'b1; engine_class_o = 2'd2; end
+      OP_PQC_INV_NTT: begin legal_o = 1'b1; engine_class_o = 2'd2; end
+      // OP_ECC_PADD/PDBL, OP_ED25519, OP_X25519, OP_RSA_CRT:
       // reserved slots -> STATUS_UNSUPPORTED until engines land
       default: ;
     endcase
