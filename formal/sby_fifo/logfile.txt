@@ -1,0 +1,20 @@
+SBY 22:56:27 [formal/sby_fifo] Removing directory 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fifo'.
+SBY 22:56:27 [formal/sby_fifo] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_pkg.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fifo/src/gf_pkg.sv'.
+SBY 22:56:27 [formal/sby_fifo] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_fifo.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fifo/src/gf_fifo.sv'.
+SBY 22:56:27 [formal/sby_fifo] engine_0: smtbmc
+SBY 22:56:27 [formal/sby_fifo] base: starting process "cd formal/sby_fifo/src& yosys -ql ../model/design.log ../model/design.ys"
+SBY 22:56:27 [formal/sby_fifo] base: Warning: Replacing memory \mem with list of registers. See gf_fifo.sv:45
+SBY 22:56:27 [formal/sby_fifo] base: finished (returncode=0)
+SBY 22:56:27 [formal/sby_fifo] prep: starting process "cd formal/sby_fifo/model& yosys -ql design_prep.log design_prep.ys"
+SBY 22:56:27 [formal/sby_fifo] prep: finished (returncode=0)
+SBY 22:56:27 [formal/sby_fifo] smt2: starting process "cd formal/sby_fifo/model& yosys -ql design_smt2.log design_smt2.ys"
+SBY 22:56:27 [formal/sby_fifo] smt2: finished (returncode=0)
+SBY 22:56:27 [formal/sby_fifo] engine_0: starting process "cd formal/sby_fifo& yosys-smtbmc --presat --unroll --noprogress -t 20  --append 0 --dump-vcd engine_0/trace.vcd --dump-yw engine_0/trace.yw --dump-vlogtb engine_0/trace_tb.v --dump-smtc engine_0/trace.smtc model/design_smt2.smt2"
+SBY 22:56:27 [formal/sby_fifo] engine_0: failed to create process.
+SBY 22:56:27 [formal/sby_fifo] engine_0: finished (returncode=0)
+SBY 22:56:27 [formal/sby_fifo] ERROR: engine_0: Engine terminated without status.
+SBY 22:56:27 [formal/sby_fifo] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:00 (0)
+SBY 22:56:27 [formal/sby_fifo] summary: Elapsed process time unvailable on Windows
+SBY 22:56:27 [formal/sby_fifo] summary: engine_0 (smtbmc) did not return a status
+SBY 22:56:27 [formal/sby_fifo] summary: engine_0 did not produce any traces
+SBY 22:56:27 [formal/sby_fifo] DONE (ERROR, rc=16)

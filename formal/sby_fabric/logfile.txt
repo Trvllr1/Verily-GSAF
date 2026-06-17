@@ -1,0 +1,26 @@
+SBY 22:55:02 [formal/sby_fabric] Removing directory 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric'.
+SBY 22:55:02 [formal/sby_fabric] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_pkg.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric/src/gf_pkg.sv'.
+SBY 22:55:02 [formal/sby_fabric] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_fifo.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric/src/gf_fifo.sv'.
+SBY 22:55:02 [formal/sby_fabric] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_mont_mult.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric/src/gf_mont_mult.sv'.
+SBY 22:55:02 [formal/sby_fabric] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_montgomery_cluster.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric/src/gf_montgomery_cluster.sv'.
+SBY 22:55:02 [formal/sby_fabric] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_modexp_engine.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric/src/gf_modexp_engine.sv'.
+SBY 22:55:02 [formal/sby_fabric] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_modinv_engine.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric/src/gf_modinv_engine.sv'.
+SBY 22:55:02 [formal/sby_fabric] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_microcode_rom.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric/src/gf_microcode_rom.sv'.
+SBY 22:55:02 [formal/sby_fabric] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_operand_banks.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric/src/gf_operand_banks.sv'.
+SBY 22:55:02 [formal/sby_fabric] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_transaction_table.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric/src/gf_transaction_table.sv'.
+SBY 22:55:02 [formal/sby_fabric] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_scheduler.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric/src/gf_scheduler.sv'.
+SBY 22:55:02 [formal/sby_fabric] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_completion_queue.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric/src/gf_completion_queue.sv'.
+SBY 22:55:02 [formal/sby_fabric] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_reorder_buffer.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric/src/gf_reorder_buffer.sv'.
+SBY 22:55:02 [formal/sby_fabric] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_axil_frontend.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric/src/gf_axil_frontend.sv'.
+SBY 22:55:02 [formal/sby_fabric] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/rtl/gf_secure_fabric_top.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric/src/gf_secure_fabric_top.sv'.
+SBY 22:55:02 [formal/sby_fabric] Copy 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/fv/gf_secure_fabric_formal.sv' to 'C:/Users/Esther Akintoye/Desktop/Verily/Verily-GSAF/formal/sby_fabric/src/gf_secure_fabric_formal.sv'.
+SBY 22:55:02 [formal/sby_fabric] engine_0: smtbmc
+SBY 22:55:02 [formal/sby_fabric] base: starting process "cd formal/sby_fabric/src& yosys -ql ../model/design.log ../model/design.ys"
+SBY 22:55:03 [formal/sby_fabric] base: gf_montgomery_cluster.sv:29: ERROR: syntax error, unexpected '[', expecting ',' or '=' or ')'
+SBY 22:55:03 [formal/sby_fabric] base: finished (returncode=1)
+SBY 22:55:03 [formal/sby_fabric] base: task failed. ERROR.
+SBY 22:55:03 [formal/sby_fabric] summary: Elapsed clock time [H:MM:SS (secs)]: 0:00:00 (0)
+SBY 22:55:03 [formal/sby_fabric] summary: Elapsed process time unvailable on Windows
+SBY 22:55:03 [formal/sby_fabric] summary: engine_0 (smtbmc) did not return a status
+SBY 22:55:03 [formal/sby_fabric] summary: engine_0 did not produce any traces
+SBY 22:55:03 [formal/sby_fabric] DONE (ERROR, rc=16)

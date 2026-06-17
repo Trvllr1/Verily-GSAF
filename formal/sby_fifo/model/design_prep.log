@@ -1,0 +1,79 @@
+
+ /----------------------------------------------------------------------------\
+ |  yosys -- Yosys Open SYnthesis Suite                                       |
+ |  Copyright (C) 2012 - 2025  Claire Xenia Wolf <claire@yosyshq.com>         |
+ |  Distributed under an ISC-like license, type "license" to see terms        |
+ \----------------------------------------------------------------------------/
+ Yosys 0.56 (git sha1 9c447ad9d4b1ea589369364eea38b4d70da2c599, x86_64-w64-mingw32-g++ 16.1.0 -march=nocona -msahf -mtune=generic -O2 -fstack-protector-strong -O3)
+
+-- Executing script file `design_prep.ys' --
+
+1. Executing RTLIL frontend.
+Input filename: design.il
+
+2. Executing SCC pass (detecting logic loops).
+Found 0 SCCs in module gf_fifo.
+Found 0 SCCs.
+
+3. Executing SIMPLEMAP pass (map simple cells to gate primitives).
+
+4. Executing MEMORY_NORDFF pass (extracting $dff cells from memories).
+
+5. Executing CLK2FFLOGIC pass (convert clocked FFs to generic $ff cells).
+
+5.1. Executing PEEPOPT pass (run peephole optimizers).
+Replacing gf_fifo.$procdff$93 ($dff): CLK=\clk_i, D=$auto$rtlil.cc:3098:Mux$92, Q=\mem[0]
+Replacing gf_fifo.$procdff$86 ($adff): CLK=\clk_i, D=$0\cnt_q[2:0], Q=\cnt_q
+Replacing gf_fifo.$procdff$81 ($adff): CLK=\clk_i, D=$0\rptr_q[1:0], Q=\rptr_q
+Replacing gf_fifo.$procdff$76 ($adff): CLK=\clk_i, D=$0\wptr_q[1:0], Q=\wptr_q
+Replacing gf_fifo.$procdff$114 ($dff): CLK=\clk_i, D=$auto$rtlil.cc:3098:Mux$113, Q=\mem[3]
+Replacing gf_fifo.$procdff$107 ($dff): CLK=\clk_i, D=$auto$rtlil.cc:3098:Mux$106, Q=\mem[2]
+Replacing gf_fifo.$procdff$100 ($dff): CLK=\clk_i, D=$auto$rtlil.cc:3098:Mux$99, Q=\mem[1]
+
+6. Executing OPT_CLEAN pass (remove unused cells and wires).
+Finding unused cells or wires in module \gf_fifo..
+Removed 0 unused cells and 7 unused wires.
+<suppressed ~1 debug messages>
+
+7. Executing FORMALFF pass.
+
+8. Executing OPT_CLEAN pass (remove unused cells and wires).
+Finding unused cells or wires in module \gf_fifo..
+
+9. Executing CHECK pass (checking for obvious problems).
+Checking module gf_fifo...
+Found and reported 0 problems.
+
+10. Executing SETUNDEF pass (replace undef values with defined constants).
+
+11. Executing OPT pass (performing simple optimizations).
+
+11.1. Executing OPT_EXPR pass (perform const folding).
+Optimizing module gf_fifo.
+<suppressed ~3 debug messages>
+
+11.2. Executing OPT_MERGE pass (detect identical cells).
+Finding identical cells in module `\gf_fifo'.
+<suppressed ~48 debug messages>
+Removed a total of 16 cells.
+
+11.3. Executing OPT_DFF pass (perform DFF optimizations).
+
+11.4. Executing OPT_CLEAN pass (remove unused cells and wires).
+Finding unused cells or wires in module \gf_fifo..
+Removed 0 unused cells and 16 unused wires.
+<suppressed ~1 debug messages>
+
+11.5. Finished fast OPT passes.
+
+12. Executing OPT_CLEAN pass (remove unused cells and wires).
+Finding unused cells or wires in module \gf_fifo..
+Removed 0 unused cells and 1 unused wires.
+<suppressed ~1 debug messages>
+
+13. Executing RTLIL backend.
+Output filename: ../model/design_prep.il
+
+End of script. Logfile hash: 165d36b2fe
+Yosys 0.56 (git sha1 9c447ad9d4b1ea589369364eea38b4d70da2c599, x86_64-w64-mingw32-g++ 16.1.0 -march=nocona -msahf -mtune=generic -O2 -fstack-protector-strong -O3)
+Time spent: 5% 4x opt_clean (0 sec), 5% 2x write_rtlil (0 sec), ...

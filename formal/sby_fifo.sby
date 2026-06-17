@@ -1,0 +1,16 @@
+[options]
+mode bmc
+depth 20
+multiclock on
+
+[script]
+read -sv gf_pkg.sv
+read -sv gf_fifo.sv
+prep -top gf_fifo
+
+[engines]
+smtbmc
+
+[files]
+rtl/gf_pkg.sv
+rtl/gf_fifo.sv

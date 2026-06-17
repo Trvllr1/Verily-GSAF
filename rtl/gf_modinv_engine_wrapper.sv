@@ -14,7 +14,7 @@ module gf_modinv_engine_wrapper
   import gf_pkg::*;
 #(
   parameter int unsigned WIDTH         = gf_pkg::GF_WIDTH_DEFAULT,
-  parameter int unsigned DIVSTEP_BOUND = gf_pkg::gf_divstep_bound(WIDTH)
+  parameter int unsigned DIVSTEP_BOUND = gf_pkg::GF_DIVSTEP_BOUND_64  // Use pre-computed value
 ) (
   input  logic clk_i,
   input  logic rst_ni,
