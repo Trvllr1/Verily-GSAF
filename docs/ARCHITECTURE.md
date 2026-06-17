@@ -61,6 +61,71 @@ reads stalls `result_fifo`; the completion queue (depth = MAX_TXNS,
 credit-based) still absorbs every outstanding completion, so engine pipelines
 never observe host backpressure.
 
+## Engine Interface Contract (`gf_engine_if.sv`)
+
+The formally specified interface between the chassis and pluggable engines.
+Engines implement this interface; the chassis consumes it. Formal verification
+proves each side independently.
+
+### Interface Signals
+
+| Signal | Direction | Description |
+|--------|-----------|-------------|
+| `cmd_valid` | chassis → engine | Command valid |
+| `cmd_ready` | engine → chassis | Engine ready to accept command |
+| `cmd_opcode` | chassis → engine | Operation code (OP_MODEXP, OP_MODINV, etc.) |
+| `cmd_txn_id` | chassis → engine | Transaction identifier |
+| `cmd_base` | chassis → engine | Base operand (ModExp) or `a` (ModInv) |
+| `cmd_exp` | chassis → engine | Exponent (ModExp), unused for ModInv |
+| `cmd_m` | chassis → engine | Modulus |
+| `rsp_valid` | engine → chassis | Result valid |
+| `rsp_ready` | chassis → engine | Chassis ready to accept result |
+| `rsp_result` | engine → chassis | Computed result |
+| `rsp_status` | engine → chassis | Status code (OK, INVALID_INPUT, etc.) |
+| `rsp_txn_id` | engine → chassis | Transaction identifier (echoed) |
+| `engine_idle` | engine → chassis | Engine is in IDLE state |
+
+### Security Properties (SVA)
+
+| Property | Description |
+|----------|-------------|
+| P_E1 | **Eventual response**: command accepted → result produced within bounded cycles |
+| P_E2 | **Legal status**: every response carries a valid status code |
+| P_E3 | **Backpressure immunity**: engine completes regardless of result read timing |
+| P_E4 | **One-at-a-time**: only one command processed at a time |
+| P_E5 | **Valid/ready protocol**: standard handshaking, no combinational loops |
+
+### Wrapper Modules
+
+Existing engines are NOT modified. Lightweight wrapper modules adapt the
+engine ports to the interface:
+
+- `gf_modexp_engine_wrapper.sv` — adapts gf_modexp_engine
+- `gf_modinv_engine_wrapper.sv` — adapts gf_modinv_engine
+
+## Dyno Test Harnesses
+
+A "dyno" is a minimal test harness that mimics the chassis — it connects to
+a single engine through `gf_engine_if.sv` and verifies the engine in isolation.
+
+### Structure
+
+```
+tb/dynos/
+├── dyno_common.py       # Shared infrastructure (clock, reset, driver, collector)
+├── dyno_modexp.py       # ModExp engine tests
+├── dyno_modinv.py       # ModInv engine tests
+├── tb_dyno_modexp.sv    # SV wrapper for cocotb
+├── tb_dyno_modinv.sv    # SV wrapper for cocotb
+└── Makefile             # cocotb simulation
+```
+
+### Key Principle
+
+Each engine is verified on its own dyno. The chassis is verified against the
+same interface spec. Integration correctness is proven by the formal interface
+properties, not by re-simulating the full system.
+
 ## Deviations from the V5 draft (all intentional)
 
 | # | Draft said | Implemented | Why |
