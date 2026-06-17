@@ -37,7 +37,7 @@ check-tools:
 
 # ─── Lint ────────────────────────────────────────────────────────────────────
 lint:
-	$(VERILATOR) --lint-only -Wall -f $(F_FILE) \
+	$(VERILATOR) --lint-only -Wall -I$(RTL_DIR) -f $(F_FILE) \
 		--top-module gf_secure_fabric_top 2>&1 | tee lint.log
 	@echo "Lint complete. Check lint.log for details."
 
