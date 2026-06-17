@@ -1,0 +1,19 @@
+[options]
+mode prove
+depth 50
+wait 200
+multiclock on
+
+[script]
+read -sv ../rtl/gf_pkg.sv
+read -sv ../rtl/gf_mont_mult.sv
+read -sv ../rtl/gf_modexp_engine.sv
+prep -top gf_modexp_engine
+
+[engines]
+smtbmc
+
+[files]
+../rtl/gf_pkg.sv
+../rtl/gf_mont_mult.sv
+../rtl/gf_modexp_engine.sv

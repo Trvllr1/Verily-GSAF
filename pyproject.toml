@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "gsaf"
+version = "0.1.0"
+description = "GSAF Studio - Constant-time cryptographic arithmetic fabric verification"
+requires-python = ">=3.10"
+dependencies = [
+    "cocotb>=2.0",
+    "cocotbext-axi>=0.1.28",
+    "typer>=0.12",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+]
+
+[project.scripts]
+gsaf = "gsaf_cli:app"
+
+[tool.cocotb]
+simulator = "verilator"
+
+[tool.cocotb.verilator]
+compile_flags = ["-DGF_ASSERTIONS", "--timing"]

@@ -1,0 +1,42 @@
+site_name: GSAF Studio
+site_description: Constant-time cryptographic arithmetic fabric verification
+site_url: https://trvllr1.github.io/Verily-GSAF
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: green
+      accent: light green
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: green
+      accent: light green
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+
+nav:
+  - Home: index.md
+  - Architecture: ARCHITECTURE.md
+  - Verification: VERIFICATION.md
+  - Getting Started: getting-started.md
+  - CLI Reference: cli.md
+  - Evidence Packs: evidence.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true

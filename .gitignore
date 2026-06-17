@@ -1,0 +1,47 @@
+# Build artifacts
+obj_dir/
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.pyc
+
+# Simulation outputs
+*.vcd
+*.fst
+*.wlf
+simv
+simv.daidir/
+csrc/
+ucli.key
+inter.vpd
+
+# Verilator
+obj_dir/
+
+# SymbiYosys work directories
+*_sbys/
+workdir/
+
+# cocotb
+results.xml
+
+# Evidence pack (generated, not source-controlled)
+evidence-pack/01_chassis/rtl/
+evidence-pack/01_chassis/formal/results/
+evidence-pack/01_chassis/simulation/
+evidence-pack/01_chassis/golden_model/
+evidence-pack/02_*/formal/results/
+evidence-pack/02_*/dyno/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
