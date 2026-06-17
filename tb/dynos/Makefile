@@ -39,7 +39,7 @@ include $(shell $(COCOTB_CONFIG) --makefiles)/Makefile.sim
 
 # Check if cocotbvpi_verilator DLL exists (needed for Verilator on Windows)
 check-vpi:
-	@if [ "$(OS)" = "Windows_NT" ] && ! [ -f "$(shell $(PYTHON) -c "import cocotb,os; print(os.path.join(os.path.dirname(cocotb.__file__),'libs','cocotbvpi_verilator.dll').replace(chr(92),'/'))")" ]; then \
+	@if ! [ -f "$(shell $(PYTHON) -c "import cocotb,os; print(os.path.join(os.path.dirname(cocotb.__file__),'libs','cocotbvpi_verilator.dll').replace(chr(92),'/'))")" ]; then \
 		echo "ERROR: cocotbvpi_verilator.dll not found."; \
 		echo "cocotb does not ship this DLL for Windows. Use WSL2 or Linux."; \
 		echo "See: scripts/setup_sim.sh"; \
