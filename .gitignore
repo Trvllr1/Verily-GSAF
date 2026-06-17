@@ -22,6 +22,8 @@ obj_dir/
 # SymbiYosys work directories
 *_sbys/
 workdir/
+formal/sby_*/
+formal/*/
 
 # cocotb
 results.xml

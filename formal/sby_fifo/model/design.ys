@@ -1,9 +1,0 @@
-# running in formal/sby_fifo/src/
-read -sv gf_pkg.sv
-read -sv gf_fifo.sv
-prep -top gf_fifo
-
-hierarchy -smtcheck
-rename -witness
-write_jny -no-connections ../model/design.json
-write_rtlil ../model/design.il
