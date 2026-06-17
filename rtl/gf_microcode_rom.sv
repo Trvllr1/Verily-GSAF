@@ -25,7 +25,9 @@ module gf_microcode_rom
       OP_PQC:         begin legal_o = 1'b1; engine_class_o = 2'd2; end
       OP_PQC_FWD_NTT: begin legal_o = 1'b1; engine_class_o = 2'd2; end
       OP_PQC_INV_NTT: begin legal_o = 1'b1; engine_class_o = 2'd2; end
-      // OP_ECC_PADD/PDBL, OP_ED25519, OP_X25519, OP_RSA_CRT:
+      // RSA-CRT engine: Bellcore-attack hardened RSA private key operation
+      OP_RSA_CRT: begin legal_o = 1'b1; engine_class_o = 2'd3; end
+      // OP_ECC_PADD/PDBL, OP_ED25519, OP_X25519:
       // reserved slots -> STATUS_UNSUPPORTED until engines land
       default: ;
     endcase
