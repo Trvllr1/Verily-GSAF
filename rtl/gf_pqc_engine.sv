@@ -68,11 +68,6 @@ module gf_pqc_engine
   input  logic [WIDTH-1:0]   coeff_rd_data
 );
 
-  // ─── Opcode definitions ──────────────────────────────────────────────────
-  localparam logic [3:0] OP_PQC_FWD_NTT = 4'hE;
-  localparam logic [3:0] OP_PQC_INV_NTT = 4'hF;
-  localparam logic [3:0] OP_PQC_BASEMUL = 4'hD;
-
   // ─── State machine ───────────────────────────────────────────────────────
   typedef enum logic [3:0] {
     S_IDLE,
@@ -119,9 +114,6 @@ module gf_pqc_engine
   assign mul_rsp_ready_o = 1'b1;
 
   // ─── Coefficient memory control ─────────────────────────────────────────
-  assign coeff_wr_en   = (state_q == S_STORE_COEFF);
-  assign coeff_wr_addr = idx_q;
-  assign coeff_wr_data = result_o;
   assign coeff_rd_en   = (state_q == S_LOAD_COEFF) || (state_q == S_NTT_LAYER);
 
   // ─── Main FSM ───────────────────────────────────────────────────────────
@@ -146,8 +138,12 @@ module gf_pqc_engine
       mul_a_o        <= '0;
       mul_b_o        <= '0;
       mul_m_o        <= '0;
+      coeff_wr_en    <= 1'b0;
+      coeff_wr_addr  <= '0;
+      coeff_wr_data  <= '0;
     end else begin
-      // Default: deassert mul_req_valid
+      // Default: deassert control signals
+      coeff_wr_en <= 1'b0;
       if (mul_req_valid_o && mul_req_ready_i)
         mul_inflight_q <= 1'b1;
       if (mul_rsp_valid_i)
@@ -209,7 +205,7 @@ module gf_pqc_engine
         // ---------------------------------------------------------------
         S_MUL_WAIT: begin
           mul_req_valid_o <= 1'b0;
-          if (mul_rsp_valid_i && mul_inflight_q) begin
+          if (mul_rsp_valid_i) begin
             // Store result
             coeff_b_q <= mul_p_i;  // butterfly output
             state_q   <= S_STORE_COEFF;

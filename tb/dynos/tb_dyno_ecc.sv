@@ -8,19 +8,18 @@
 `timescale 1ns/1ps
 `include "gf_pkg.sv"
 
-module tb_dyno_ecc;
+module tb_dyno_ecc (
+  input logic clk_i,
+  input logic rst_ni
+);
   import gf_pkg::*;
 
   localparam int unsigned WIDTH = 255;
 
-  logic clk = 0;
-  logic rst_n = 0;
-  always #5 clk = ~clk;
-
   // Engine interface
   gf_engine_if #(.WIDTH(WIDTH), .EXP_W(WIDTH)) engine_if (
-    .clk_i  (clk),
-    .rst_ni (rst_n)
+    .clk_i  (clk_i),
+    .rst_ni (rst_ni)
   );
 
   // Multiplier lane signals (simulated)
@@ -33,8 +32,8 @@ module tb_dyno_ecc;
     .WIDTH      (WIDTH),
     .CURVE_TYPE (0)  // X25519
   ) u_wrapper (
-    .clk_i          (clk),
-    .rst_ni         (rst_n),
+    .clk_i          (clk_i),
+    .rst_ni         (rst_ni),
     .engine_if      (engine_if),
     .mul_req_valid_o(mul_req_valid),
     .mul_req_ready_i(mul_req_ready),
@@ -46,16 +45,24 @@ module tb_dyno_ecc;
     .mul_p_i        (mul_p)
   );
 
-  // Simulated multiplier: simple modular multiply for functional verification
-  assign mul_req_ready = 1'b1;
-  always_ff @(posedge clk) begin
-    if (mul_req_valid) begin
-      mul_p <= (mul_a * mul_b) % mul_m;
-      mul_rsp_valid <= 1'b1;
-    end else begin
-      mul_rsp_valid <= 1'b0;
+  // Simulated Montgomery multiplier: a*b*R^-1 mod m, R = 2^WIDTH
+  function automatic logic [WIDTH-1:0] mont_mult_fn(
+    input logic [WIDTH-1:0] a, b, m
+  );
+    logic [WIDTH:0] acc;
+    acc = '0;
+    for (int i = 0; i < WIDTH; i++) begin
+      if (a[i]) acc = acc + {1'b0, b};
+      if (acc[0]) acc = acc + {1'b0, m};
+      acc = acc >> 1;
     end
-  end
+    if (acc >= {1'b0, m}) acc = acc - {1'b0, m};
+    return acc[WIDTH-1:0];
+  endfunction
+
+  assign mul_req_ready = 1'b1;
+  assign mul_p = mont_mult_fn(mul_a, mul_b, mul_m);
+  assign mul_rsp_valid = mul_req_valid;
 
   initial begin
     $dumpfile("dump.vcd");

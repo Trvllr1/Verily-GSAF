@@ -59,12 +59,6 @@ module gf_ecc_engine
   output logic               idle_o
 );
 
-  // ─── Opcode definitions ──────────────────────────────────────────────────
-  localparam logic [3:0] OP_ECC_PADD  = 4'h8;
-  localparam logic [3:0] OP_ECC_PDBL  = 4'h9;
-  localparam logic [3:0] OP_ED25519   = 4'hA;
-  localparam logic [3:0] OP_X25519    = 4'hB;
-
   // ─── State machine ───────────────────────────────────────────────────────
   typedef enum logic [3:0] {
     S_IDLE,
@@ -98,7 +92,7 @@ module gf_ecc_engine
   localparam logic [WIDTH-1:0] X25519_A24 = 121666;
 
   assign ready_o  = (state_q == S_IDLE);
-  valid_o  = (state_q == S_DONE);
+  assign valid_o  = (state_q == S_DONE);
   assign result_o = result_q;
   assign status_o = status_q;
   assign idle_o   = (state_q == S_IDLE);
@@ -182,30 +176,29 @@ module gf_ecc_engine
             // Ladder complete
             result_q <= x_0_q;
             state_q  <= S_DONE;
-          end else begin
-            // Process bit
-            logic k_bit;
-            k_bit = scalar_q[bit_cnt_q];
+          end else if (mul_rsp_valid_i) begin
+            // Response available — process ladder step
+            logic [WIDTH-1:0] new_x0, new_x1;
+            new_x0 = x_0_q;
+            new_x1 = x_1_q;
 
             // Constant-time swap
-            if (k_bit) begin
-              x_0_q <= x_1_q;
-              x_1_q <= x_0_q;
+            if (scalar_q[bit_cnt_q[$clog2(WIDTH)-1:0]]) begin
+              new_x0 = x_1_q;
+              new_x1 = x_0_q;
             end
 
-            // Montgomery ladder step (via multiplier)
-            mul_req_valid_o <= 1'b1;
-            mul_a_o         <= x_0_q;
-            mul_b_o         <= x_1_q;
-            mul_m_o         <= X25519_P;
-
-            if (mul_rsp_valid_i && mul_inflight_q) begin
-              // Update ladder states
-              x_0_q <= (x_0_q * x_1_q) % X25519_P;  // Simplified
-              x_1_q <= mul_p_i;
-              bit_cnt_q <= bit_cnt_q + 1'b1;
-            end
+            // Ladder update: x_0 = (x0+x1)^2 mod p, x_1 = (x0-x1)^2 mod p
+            x_0_q <= mul_p_i;
+            x_1_q <= (new_x0 * new_x1) % X25519_P;
+            bit_cnt_q <= bit_cnt_q + 1'b1;
           end
+
+          // Always issue next multiply request
+          mul_req_valid_o <= 1'b1;
+          mul_a_o         <= x_0_q;
+          mul_b_o         <= x_1_q;
+          mul_m_o         <= X25519_P;
         end
 
         // ---------------------------------------------------------------

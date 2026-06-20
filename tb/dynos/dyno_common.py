@@ -42,7 +42,7 @@ async def wait_idle(dut, timeout_cycles=10000):
         if dut.engine_if.engine_idle.value:
             return True
         await RisingEdge(dut.clk_i)
-    raise cocotb.result.TestFailure(f"Timeout waiting for idle after {timeout_cycles} cycles")
+    raise AssertionError(f"Timeout waiting for idle after {timeout_cycles} cycles")
 
 
 async def drive_command(dut, opcode, txn_id, base, exp, m, width=64):
@@ -80,7 +80,7 @@ async def collect_result(dut, timeout_cycles=100000):
 
         await RisingEdge(dut.clk_i)
 
-    raise cocotb.result.TestFailure(f"Timeout waiting for result after {timeout_cycles} cycles")
+    raise AssertionError(f"Timeout waiting for result after {timeout_cycles} cycles")
 
 
 def get_width():

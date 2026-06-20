@@ -8,28 +8,27 @@
 `timescale 1ns/1ps
 `include "gf_pkg.sv"
 
-module tb_dyno_modinv;
+module tb_dyno_modinv (
+  input logic clk_i,
+  input logic rst_ni
+);
   import gf_pkg::*;
 
   localparam int unsigned WIDTH = 64;
 
-  logic clk = 0;
-  logic rst_n = 0;
-  always #5 clk = ~clk;
-
   // Engine interface
   gf_engine_if #(.WIDTH(WIDTH), .EXP_W(WIDTH)) engine_if (
-    .clk_i  (clk),
-    .rst_ni (rst_n)
+    .clk_i  (clk_i),
+    .rst_ni (rst_ni)
   );
 
-  // Wrapper instantiation
+  // Wrapper instantiation (DIVSTEP_BOUND from gf_pkg pre-computed parameters)
   gf_modinv_engine_wrapper #(
     .WIDTH         (WIDTH),
-    .DIVSTEP_BOUND (gf_divstep_bound(WIDTH))
+    .DIVSTEP_BOUND (GF_DIVSTEP_BOUND_64)
   ) u_wrapper (
-    .clk_i     (clk),
-    .rst_ni    (rst_n),
+    .clk_i     (clk_i),
+    .rst_ni    (rst_ni),
     .engine_if (engine_if)
   );
 
