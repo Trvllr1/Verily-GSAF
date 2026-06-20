@@ -84,7 +84,7 @@ module gf_rsa_crt_engine
   logic [1:0]        done_cnt_q;
 
   assign ready_o  = (state_q == S_IDLE);
-  valid_o  = (state_q == S_DONE);
+  assign valid_o  = (state_q == S_DONE);
   assign result_o = result_q;
   assign status_o = status_q;
   assign idle_o   = (state_q == S_IDLE);
@@ -150,7 +150,7 @@ module gf_rsa_crt_engine
           mul_b_o         <= dp_q;
           mul_m_o         <= p_q;
 
-          if (mul_rsp_valid_i && mul_inflight_q) begin
+          if (mul_rsp_valid_i) begin
             s1_q   <= mul_p_i;
             state_q <= S_MODEXP_Q;
           end
@@ -166,7 +166,7 @@ module gf_rsa_crt_engine
           mul_b_o         <= dp_q;  // would be dq_i in full implementation
           mul_m_o         <= q_q;
 
-          if (mul_rsp_valid_i && mul_inflight_q) begin
+          if (mul_rsp_valid_i) begin
             s2_q   <= mul_p_i;
             state_q <= S_CRT_COMBINE;
           end
@@ -177,23 +177,27 @@ module gf_rsa_crt_engine
           // h = qinv * (s1 - s2) mod p
           // s = s2 + q * h
           logic [WIDTH:0] diff;
+          logic [WIDTH-1:0] h;
           logic [WIDTH:0] h_times_q;
 
           diff = {1'b0, s1_q} - {1'b0, s2_q};
           if (diff[WIDTH]) diff = diff + {1'b0, p_q};  // mod p
 
-          // h = qinv * diff mod p (use multiplier)
-          mul_req_valid_o <= 1'b1;
-          mul_a_o         <= qinv_q;
-          mul_b_o         <= diff[WIDTH-1:0];
-          mul_m_o         <= p_q;
-
-          if (mul_rsp_valid_i && mul_inflight_q) begin
-            // s = s2 + q * h
-            h_times_q = {1'b0, q_q} * {1'b0, mul_p_i};
-            s_q <= s2_q + h_times_q[WIDTH-1:0];
-            state_q <= S_VERIFY;
+          // h = qinv * diff mod p (computed inline)
+          begin
+            logic [2*WIDTH-1:0] product;
+            logic [2*WIDTH-1:0] modulus;
+            logic [2*WIDTH-1:0] mod_result;
+            product = {1'b0, qinv_q} * {1'b0, diff[WIDTH-1:0]};
+            modulus = {{WIDTH{1'b0}}, p_q};
+            mod_result = product % modulus;
+            h = mod_result[WIDTH-1:0];
           end
+
+          // s = s2 + q * h
+          h_times_q = {1'b0, q_q} * {1'b0, h};
+          s_q <= s2_q + h_times_q[WIDTH-1:0];
+          state_q <= S_VERIFY;
         end
 
         // ---------------------------------------------------------------
@@ -205,10 +209,10 @@ module gf_rsa_crt_engine
 
           mul_req_valid_o <= 1'b1;
           mul_a_o         <= s_q;
-          mul_b_o         <= 16'h10001;  // e = 65537
+          mul_b_o         <= 64'h10001;  // e = 65537
           mul_m_o         <= n;
 
-          if (mul_rsp_valid_i && mul_inflight_q) begin
+          if (mul_rsp_valid_i) begin
             if (mul_p_i != m_q) begin
               // Verification failed - Bellcore attack detected
               result_q <= '0;

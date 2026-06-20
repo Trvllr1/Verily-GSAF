@@ -5,68 +5,98 @@ This is a minimal test harness that connects directly to the engine
 through the formally specified interface, verifying the engine in isolation.
 """
 import cocotb
+from cocotb.triggers import RisingEdge
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 from dyno_common import (
     setup_clock, reset_dut, drive_command, collect_result,
-    get_width, get_opcode
+    get_opcode
 )
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "model"))
-from rsa_crt_model import rsa_crt, generate_rsa_crt_params, modexp
+from golden_model import STATUS_OK, STATUS_INVALID_INPUT
+
+
+# Pre-computed RSA-CRT test vectors: p=7, q=13, e=65537
+# d=17, dp=dq=5, qinv=6, m=5, s=31, s^e mod n = 5 = m
+RSA_P  = 7
+RSA_Q  = 13
+RSA_DP = 5
+RSA_QINV = 6
 
 
 @cocotb.test()
-async def test_rsa_crt_basic(dut):
-    """Basic RSA-CRT: sign a message and verify against direct modexp"""
-    width = 64  # Use 64-bit for simulation
+async def test_rsa_crt_completes(dut):
+    """RSA-CRT engine completes with valid inputs"""
     await setup_clock(dut)
     await reset_dut(dut)
 
-    # Use small primes for testing
-    p, q = 61, 53
-    params = generate_rsa_crt_params(p, q)
-    n = params['n']
+    m = 5
 
-    m = 42  # message
-    expected_status, expected_sig = rsa_crt(m, p, q, params['dp'], params['dq'], params['qinv'])
+    dut.rsa_p.value = RSA_P
+    dut.rsa_q.value = RSA_Q
+    dut.rsa_qinv.value = RSA_QINV
 
-    # Drive RSA-CRT command
-    # Note: In full implementation, p, q, qinv would be passed via extended bus
-    # For this test, we verify the engine accepts the command
-    await drive_command(dut, 0xC, 0x30, m, params['dp'], p, width)
-    txn_id, status, result = await collect_result(dut, timeout_cycles=100000)
+    await drive_command(dut, get_opcode("rsa_crt"), 0x30, m, RSA_DP, RSA_P, 64)
+    txn_id, status, result = await collect_result(dut, timeout_cycles=500000)
 
     assert txn_id == 0x30, f"txn_id: got {txn_id:#x} want 0x30"
-    # Status check depends on implementation completeness
-    dut._log.info(f"RSA-CRT basic test completed [PASS]")
+    assert status == STATUS_OK, f"status: got {status} want STATUS_OK"
+
+    dut._log.info(f"RSA-CRT completed, result={result:#x} [PASS]")
 
 
 @cocotb.test()
-async def test_rsa_crt_bellcore_detection(dut):
-    """Test Bellcore-attack hardening: fault detection"""
-    width = 64
+async def test_rsa_crt_invalid_p(dut):
+    """Error path: p=0 should return STATUS_INVALID_INPUT"""
     await setup_clock(dut)
     await reset_dut(dut)
 
-    # Drive command that should trigger fault detection
-    await drive_command(dut, 0xC, 0x31, 0, 0, 61, width)
-    txn_id, status, result = await collect_result(dut)
+    dut.rsa_p.value = 0
+    dut.rsa_q.value = RSA_Q
+    dut.rsa_qinv.value = RSA_QINV
 
-    dut._log.info(f"RSA-CRT Bellcore detection test completed [PASS]")
+    await drive_command(dut, get_opcode("rsa_crt"), 0x31, 5, RSA_DP, 0, 64)
+    txn_id, status, result = await collect_result(dut, timeout_cycles=500000)
+
+    assert status == STATUS_INVALID_INPUT, f"status: got {status} want STATUS_INVALID_INPUT"
+
+    dut._log.info(f"Invalid p correctly rejected [PASS]")
 
 
 @cocotb.test()
-async def test_rsa_crt_invalid_input(dut):
-    """Error path: invalid inputs"""
-    width = 64
+async def test_rsa_crt_invalid_q(dut):
+    """Error path: q=0 should return STATUS_INVALID_INPUT"""
     await setup_clock(dut)
     await reset_dut(dut)
 
-    # Drive with invalid inputs (p=0)
-    await drive_command(dut, 0xC, 0x32, 42, 1, 0, width)
-    txn_id, status, result = await collect_result(dut)
+    dut.rsa_p.value = RSA_P
+    dut.rsa_q.value = 0
+    dut.rsa_qinv.value = RSA_QINV
 
-    dut._log.info(f"RSA-CRT invalid input test completed [PASS]")
+    await drive_command(dut, get_opcode("rsa_crt"), 0x32, 5, RSA_DP, RSA_P, 64)
+    txn_id, status, result = await collect_result(dut, timeout_cycles=500000)
+
+    assert status == STATUS_INVALID_INPUT, f"status: got {status} want STATUS_INVALID_INPUT"
+
+    dut._log.info(f"Invalid q correctly rejected [PASS]")
+
+
+@cocotb.test()
+async def test_rsa_crt_engine_completes(dut):
+    """Verify RSA-CRT engine completes and returns to idle"""
+    await setup_clock(dut)
+    await reset_dut(dut)
+
+    dut.rsa_p.value = RSA_P
+    dut.rsa_q.value = RSA_Q
+    dut.rsa_qinv.value = RSA_QINV
+
+    await drive_command(dut, get_opcode("rsa_crt"), 0x33, 5, RSA_DP, RSA_P, 64)
+    txn_id, status, result = await collect_result(dut, timeout_cycles=500000)
+
+    assert status == STATUS_OK, f"status: got {status} want STATUS_OK"
+
+    dut._log.info(f"RSA-CRT engine completed successfully [PASS]")

@@ -19,6 +19,11 @@ module gf_rsa_crt_engine_wrapper
   // Engine interface (chassis side)
   gf_engine_if.engine_mp engine_if,
 
+  // RSA-CRT specific inputs (would be part of extended bus in production)
+  input  logic [WIDTH-1:0]   rsa_p_i,
+  input  logic [WIDTH-1:0]   rsa_q_i,
+  input  logic [WIDTH-1:0]   rsa_qinv_i,
+
   // Reserved multiplier lane (pass-through to cluster)
   output logic               mul_req_valid_o,
   input  logic               mul_req_ready_i,
@@ -42,9 +47,9 @@ module gf_rsa_crt_engine_wrapper
     .ready_o        (engine_if.cmd_ready),
     .m_i            (engine_if.cmd_base),   // message
     .dp_i           (engine_if.cmd_exp),    // d mod (p-1)
-    .p_i            (engine_if.cmd_m),      // prime p (would need extended bus)
-    .q_i            (engine_if.cmd_m),      // prime q (would need extended bus)
-    .qinv_i         (engine_if.cmd_m),      // q^-1 mod p (would need extended bus)
+    .p_i            (rsa_p_i),              // prime p
+    .q_i            (rsa_q_i),              // prime q
+    .qinv_i         (rsa_qinv_i),           // q^-1 mod p
     // result
     .valid_o        (engine_if.rsp_valid),
     .ready_i        (engine_if.rsp_ready),
