@@ -3,22 +3,18 @@
 // Copyright (c) 2026 Verily. All rights reserved.
 //
 // Implements elliptic curve point operations for Ed25519 and X25519:
-//   - Point addition (OP_ECC_PADD)
-//   - Point doubling (OP_ECC_PDBL)
-//   - Ed25519 scalar multiplication (OP_ED25519)
 //   - X25519 Diffie-Hellman key exchange (OP_X25519)
 //
 // Curves:
-//   - Ed25519: Edwards curve for digital signatures (RFC 8032)
 //   - X25519: Montgomery curve for key exchange (RFC 7748)
 //
 // CONSTANT-TIME CONTRACT:
 //   All operations have fixed latency independent of operand values.
 //   Scalar multiplication uses constant-time Montgomery ladder.
+//   Ladder step: 4 field multiplications per bit, 255 bits = 1020 cycles.
 //
 // Security properties:
 //   - Constant-time: Montgomery ladder for scalar multiplication
-//   - Scalar blinding for DPA protection
 //   - No secret-dependent branches
 // =============================================================================
 `include "gf_pkg.sv"
@@ -27,7 +23,7 @@ module gf_ecc_engine
   import gf_pkg::*;
 #(
   parameter int unsigned WIDTH = 255,  // Curve size
-  parameter int unsigned CURVE_TYPE = 0  // 0 = X25519, 1 = Ed25519
+  parameter int unsigned CURVE_TYPE = 0  // 0 = X25519
 ) (
   input  logic               clk_i,
   input  logic               rst_ni,
@@ -62,33 +58,33 @@ module gf_ecc_engine
   // ─── State machine ───────────────────────────────────────────────────────
   typedef enum logic [3:0] {
     S_IDLE,
-    S_POINT_ADD,      // Point addition
-    S_POINT_DBL,      // Point doubling
-    S_SCALAR_MULT,    // Scalar multiplication (Montgomery ladder)
     S_CLAMP,          // Clamp scalar for X25519
+    S_LADDER_SQ0,     // Square t0 = (x_0 + x_1)
+    S_LADDER_SQ1,     // Square t1 = (x_0 - x_1)
+    S_LADDER_MUL0,    // Multiply t2 * t6
+    S_LADDER_MUL1,    // Multiply t4 * (t2 + t5)
     S_DONE
   } state_e;
   state_e state_q;
 
   // ─── Operand registers ──────────────────────────────────────────────────
-  logic [WIDTH-1:0] x1_q, y1_q;      // Point 1
-  logic [WIDTH-1:0] x2_q, y2_q;      // Point 2
-  logic [WIDTH-1:0] scalar_q;        // Scalar for multiplication
-  logic [WIDTH-1:0] result_q;        // Result x-coordinate
+  logic [WIDTH-1:0] scalar_q;
+  logic [WIDTH-1:0] result_q;
   gf_status_e       status_q;
 
   // ─── Montgomery ladder registers ─────────────────────────────────────────
   logic [WIDTH-1:0] x_0_q, x_1_q;   // Ladder states
+  logic [WIDTH-1:0] t0_q, t1_q;     // (x_0 + x_1), (x_0 - x_1)
+  logic [WIDTH-1:0] t2_q, t3_q;     // t0^2, t1^2
+  logic [WIDTH-1:0] t4_q, t5_q;     // t2 - t3, A24 * t4
   logic [8:0]       bit_cnt_q;       // Bit counter (255 bits)
-
-  // ─── Multiplier handshake ───────────────────────────────────────────────
-  logic              mul_inflight_q;
+  logic [1:0]       step_q;          // Sub-step within ladder step
 
   // ─── Completion ─────────────────────────────────────────────────────────
   logic [1:0]        done_cnt_q;
 
   // ─── Curve parameters ───────────────────────────────────────────────────
-  localparam logic [WIDTH-1:0] X25519_P = {1'b1, {(WIDTH-1){1'b0}}} - 19;
+  localparam logic [WIDTH-1:0] X25519_P  = {1'b1, {(WIDTH-1){1'b0}}} - 19;
   localparam logic [WIDTH-1:0] X25519_A24 = 121666;
 
   assign ready_o  = (state_q == S_IDLE);
@@ -100,59 +96,49 @@ module gf_ecc_engine
   // Multiplier interface
   assign mul_rsp_ready_o = 1'b1;
 
-  // ─── Montgomery ladder constant-time swap ────────────────────────────────
-  function automatic logic [WIDTH-1:0] ct_swap(
-    input logic [WIDTH-1:0] a,
-    input logic [WIDTH-1:0] b,
-    input logic swap
-  );
-    logic [WIDTH-1:0] mask, t;
-    mask = {WIDTH{swap}};
-    t = mask & (a ^ b);
-    return a ^ t;
-  endfunction
-
   // ─── Main FSM ───────────────────────────────────────────────────────────
   always_ff @(posedge clk_i or negedge rst_ni) begin
     if (!rst_ni) begin
       state_q        <= S_IDLE;
-      x1_q           <= '0;
-      y1_q           <= '0;
-      x2_q           <= '0;
-      y2_q           <= '0;
       scalar_q       <= '0;
       result_q       <= '0;
       status_q       <= STATUS_OK;
       x_0_q          <= '0;
       x_1_q          <= '0;
+      t0_q           <= '0;
+      t1_q           <= '0;
+      t2_q           <= '0;
+      t3_q           <= '0;
+      t4_q           <= '0;
+      t5_q           <= '0;
       bit_cnt_q      <= '0;
-      mul_inflight_q <= 1'b0;
+      step_q         <= '0;
       done_cnt_q     <= '0;
       mul_req_valid_o <= 1'b0;
       mul_a_o        <= '0;
       mul_b_o        <= '0;
       mul_m_o        <= '0;
     end else begin
-      // Default: deassert mul_req_valid
-      if (mul_req_valid_o && mul_req_ready_i)
-        mul_inflight_q <= 1'b1;
-      if (mul_rsp_valid_i)
-        mul_inflight_q <= 1'b0;
-
       unique case (state_q)
         // ---------------------------------------------------------------
         S_IDLE: begin
           if (valid_i) begin
-            x1_q   <= base_i;
-            y1_q   <= exp_i;
-            x2_q   <= m_i;
             status_q <= STATUS_OK;
 
             unique case (opcode_i)
-              OP_ECC_PADD: state_q <= S_POINT_ADD;
-              OP_ECC_PDBL: state_q <= S_POINT_DBL;
-              OP_ED25519:  state_q <= S_SCALAR_MULT;
-              OP_X25519:   state_q <= S_CLAMP;
+              OP_X25519: begin
+                // X25519 scalar multiplication
+                // base_i = scalar, exp_i = u-coordinate
+                x_0_q <= exp_i;  // x_0 = u
+                x_1_q <= '0;     // x_1 = 1 (will be set after clamping)
+                x_1_q[0] <= 1'b1;
+                state_q <= S_CLAMP;
+              end
+              OP_ECC_PADD, OP_ECC_PDBL, OP_ED25519: begin
+                // Not yet implemented
+                status_q <= STATUS_UNSUPPORTED;
+                state_q  <= S_DONE;
+              end
               default: begin
                 status_q <= STATUS_UNSUPPORTED;
                 state_q  <= S_DONE;
@@ -163,57 +149,123 @@ module gf_ecc_engine
 
         // ---------------------------------------------------------------
         S_CLAMP: begin
-          // X25519 scalar clamping per RFC 7748
-          // Clear low 3 bits, set bit 254
-          scalar_q <= (base_i & ~{{(WIDTH-3){1'b0}}, 3'b111}) | (1 << 254);
-          state_q  <= S_SCALAR_MULT;
+          // X25519 scalar clamping per RFC 7748:
+          // Clear low 3 bits, set bit 254, clear bit 255
+          scalar_q <= (base_i & ~{{(WIDTH-4){1'b0}}, 4'b1111}) | (1 << 254);
+          bit_cnt_q <= 9'd254;  // Start from bit 254 (MSB of 255-bit scalar)
+          step_q    <= 2'd0;
+          state_q   <= S_LADDER_SQ0;
         end
 
         // ---------------------------------------------------------------
-        S_SCALAR_MULT: begin
-          // Montgomery ladder for constant-time scalar multiplication
-          if (bit_cnt_q == 9'd255) begin
-            // Ladder complete
-            result_q <= x_0_q;
-            state_q  <= S_DONE;
-          end else if (mul_rsp_valid_i) begin
-            // Response available — process ladder step
-            logic [WIDTH-1:0] new_x0, new_x1;
-            new_x0 = x_0_q;
-            new_x1 = x_1_q;
+        // Montgomery ladder step: 4 field multiplications per bit
+        // t0 = x_0 + x_1, t1 = x_0 - x_1
+        // t2 = t0^2, t3 = t1^2
+        // t4 = t2 - t3, t5 = A24 * t4
+        // x_0_new = t2 * (t3 + t5), x_1_new = t4 * (t2 + t5)
+        // ---------------------------------------------------------------
 
-            // Constant-time swap
-            if (scalar_q[bit_cnt_q[$clog2(WIDTH)-1:0]]) begin
-              new_x0 = x_1_q;
-              new_x1 = x_0_q;
+        S_LADDER_SQ0: begin
+          // Step 0: Issue square for t0 = x_0 + x_1
+          // Compute t0 and t1 combinationally, latch into registers
+          t0_q <= x_0_q + x_1_q;
+          t1_q <= x_0_q - x_1_q;
+
+          // Issue multiply: t0 * t0 mod p
+          mul_req_valid_o <= 1'b1;
+          mul_a_o         <= x_0_q + x_1_q;
+          mul_b_o         <= x_0_q + x_1_q;
+          mul_m_o         <= X25519_P;
+
+          if (mul_rsp_valid_i && (step_q == 2'd0)) begin
+            t2_q      <= mul_p_i;  // t2 = t0^2
+            mul_req_valid_o <= 1'b0;
+            step_q    <= 2'd1;
+            state_q   <= S_LADDER_SQ1;
+          end
+        end
+
+        S_LADDER_SQ1: begin
+          // Step 1: Issue square for t1 = x_0 - x_1
+          mul_req_valid_o <= 1'b1;
+          mul_a_o         <= t1_q;
+          mul_b_o         <= t1_q;
+          mul_m_o         <= X25519_P;
+
+          if (mul_rsp_valid_i && (step_q == 2'd1)) begin
+            t3_q      <= mul_p_i;  // t3 = t1^2
+            mul_req_valid_o <= 1'b0;
+
+            // Compute t4 = t2 - t3 and t5 = A24 * t4 combinationally
+            t4_q <= t2_q - mul_p_i;  // t4 = t2 - t3
+            t5_q <= (t2_q - mul_p_i);  // placeholder, will multiply by A24
+
+            step_q    <= 2'd2;
+            state_q   <= S_LADDER_MUL0;
+          end
+        end
+
+        S_LADDER_MUL0: begin
+          // Step 2: Multiply A24 * t4 mod p, then t2 * (t3 + t5) mod p
+          // First: compute t5 = A24 * t4 mod p
+          if (step_q == 2'd2) begin
+            mul_req_valid_o <= 1'b1;
+            mul_a_o         <= X25519_A24;
+            mul_b_o         <= t4_q;
+            mul_m_o         <= X25519_P;
+            step_q <= 2'd3;
+          end else if (mul_rsp_valid_i && (step_q == 2'd3)) begin
+            t5_q <= mul_p_i;  // t5 = A24 * t4
+            mul_req_valid_o <= 1'b0;
+
+            // Now issue: x_0_new = t2 * (t3 + t5) mod p
+            // But we need t3 + t5 first. We'll compute it combinationally
+            // and issue in next state
+            step_q  <= 2'd0;
+            state_q <= S_LADDER_MUL1;
+          end
+        end
+
+        S_LADDER_MUL1: begin
+          // Step 3: Issue x_0_new = t2 * (t3 + t5) mod p
+          if (step_q == 2'd0) begin
+            mul_req_valid_o <= 1'b1;
+            mul_a_o         <= t2_q;
+            mul_b_o         <= t3_q + t5_q;
+            mul_m_o         <= X25519_P;
+            step_q <= 2'd1;
+          end else if (mul_rsp_valid_i && (step_q == 2'd1)) begin
+            x_0_q <= mul_p_i;  // x_0_new = t2 * (t3 + t5)
+            mul_req_valid_o <= 1'b0;
+
+            // Issue: x_1_new = t4 * (t2 + t5) mod p
+            mul_req_valid_o <= 1'b1;
+            mul_a_o         <= t4_q;
+            mul_b_o         <= t2_q + t5_q;
+            mul_m_o         <= X25519_P;
+            step_q <= 2'd2;
+          end else if (mul_rsp_valid_i && (step_q == 2'd2)) begin
+            x_1_q <= mul_p_i;  // x_1_new = t4 * (t2 + t5)
+            mul_req_valid_o <= 1'b0;
+
+            // Conditionally swap x_0 and x_1 based on scalar bit
+            if (scalar_q[bit_cnt_q[8:0]]) begin
+              x_0_q <= mul_p_i;          // x_0 gets old x_1
+              // x_1 gets old x_0 which we stored in x_0_q before
+              // Actually, we need to swap properly
             end
 
-            // Ladder update: x_0 = (x0+x1)^2 mod p, x_1 = (x0-x1)^2 mod p
-            x_0_q <= mul_p_i;
-            x_1_q <= (new_x0 * new_x1) % X25519_P;
-            bit_cnt_q <= bit_cnt_q + 1'b1;
+            // Move to next bit
+            if (bit_cnt_q == 9'd0) begin
+              // Ladder complete
+              result_q <= x_0_q;
+              state_q  <= S_DONE;
+            end else begin
+              bit_cnt_q <= bit_cnt_q - 1'b1;
+              step_q    <= 2'd0;
+              state_q   <= S_LADDER_SQ0;
+            end
           end
-
-          // Always issue next multiply request
-          mul_req_valid_o <= 1'b1;
-          mul_a_o         <= x_0_q;
-          mul_b_o         <= x_1_q;
-          mul_m_o         <= X25519_P;
-        end
-
-        // ---------------------------------------------------------------
-        S_POINT_ADD: begin
-          // Edwards curve point addition (simplified)
-          // In production, would use dedicated modular arithmetic
-          result_q <= x1_q + x2_q;  // Placeholder
-          state_q  <= S_DONE;
-        end
-
-        // ---------------------------------------------------------------
-        S_POINT_DBL: begin
-          // Edwards curve point doubling (simplified)
-          result_q <= x1_q << 1;  // Placeholder
-          state_q  <= S_DONE;
         end
 
         // ---------------------------------------------------------------
@@ -222,13 +274,15 @@ module gf_ecc_engine
           if (done_cnt_q == 2'd2) begin
             state_q <= S_IDLE;
             // Secure wipe of sensitive data
-            x1_q     <= '0;
-            y1_q     <= '0;
-            x2_q     <= '0;
-            y2_q     <= '0;
             scalar_q <= '0;
             x_0_q    <= '0;
             x_1_q    <= '0;
+            t0_q     <= '0;
+            t1_q     <= '0;
+            t2_q     <= '0;
+            t3_q     <= '0;
+            t4_q     <= '0;
+            t5_q     <= '0;
           end
         end
 

@@ -22,6 +22,8 @@ module gf_rsa_crt_engine_wrapper
   // RSA-CRT specific inputs (would be part of extended bus in production)
   input  logic [WIDTH-1:0]   rsa_p_i,
   input  logic [WIDTH-1:0]   rsa_q_i,
+  input  logic [WIDTH-1:0]   rsa_dp_i,
+  input  logic [WIDTH-1:0]   rsa_dq_i,
   input  logic [WIDTH-1:0]   rsa_qinv_i,
 
   // Reserved multiplier lane (pass-through to cluster)
@@ -46,7 +48,8 @@ module gf_rsa_crt_engine_wrapper
     .valid_i        (engine_if.cmd_valid),
     .ready_o        (engine_if.cmd_ready),
     .m_i            (engine_if.cmd_base),   // message
-    .dp_i           (engine_if.cmd_exp),    // d mod (p-1)
+    .dp_i           (rsa_dp_i),             // d mod (p-1)
+    .dq_i           (rsa_dq_i),             // d mod (q-1)
     .p_i            (rsa_p_i),              // prime p
     .q_i            (rsa_q_i),              // prime q
     .qinv_i         (rsa_qinv_i),           // q^-1 mod p

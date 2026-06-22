@@ -58,7 +58,7 @@ module gf_engine_template
   logic [CNT_W-1:0] cnt_q;
 
   assign ready_o  = (state_q == S_IDLE);
-  valid_o  = (state_q == S_DONE);
+  assign valid_o  = (state_q == S_DONE);
   assign result_o = result_q;
   assign status_o = status_q;
   assign idle_o   = (state_q == S_IDLE);

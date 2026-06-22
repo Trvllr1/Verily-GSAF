@@ -2,9 +2,9 @@
 // gf_secure_fabric_top - GreenField Secure Arithmetic Fabric, top level
 // Copyright (c) 2026 Verily. All rights reserved.
 //
-//   axi_frontend -> command_fifo -> scheduler -> { modexp_engine (+ montgomery
-//   cluster lane via static reservation), modinv_engine } -> completion_queue
-//   -> reorder_buffer -> result_fifo -> axi_frontend
+//   axi_frontend -> command_fifo -> scheduler -> { modexp, modinv, PQC,
+//   RSA-CRT, ECC } -> completion_queue -> reorder_buffer -> result_fifo ->
+//   axi_frontend
 //
 // Backpressure firewall: engines never touch result_fifo; host stalls are
 // absorbed in result_fifo/ROB and can never reach arithmetic pipelines.
@@ -17,7 +17,7 @@ module gf_secure_fabric_top
 #(
   parameter int unsigned    WIDTH             = gf_pkg::GF_WIDTH_DEFAULT,
   parameter gf_order_mode_e RESPONSE_ORDERING = MODE_OOO,
-  parameter int unsigned    NUM_MULTIPLIERS   = 1,
+  parameter int unsigned    NUM_MULTIPLIERS   = 3,
   // DPA countermeasure: exponent datapath is WIDTH + EXP_BLIND_BITS wide so
   // hosts can submit blinded exponents d' = d + k*lambda(m)
   parameter int unsigned    EXP_BLIND_BITS    = 64,
@@ -86,7 +86,9 @@ module gf_secure_fabric_top
   logic                       retire;
   logic [SEQ_W-1:0]           retire_bank;
 
-  // engines
+  // ---------------------------------------------------------------------------
+  // engine 0: modexp
+  // ---------------------------------------------------------------------------
   logic             e0_cmd_valid, e0_cmd_ready;
   logic [WIDTH-1:0] e0_base, e0_m;
   logic [EXP_W-1:0] e0_exp;
@@ -95,6 +97,9 @@ module gf_secure_fabric_top
   gf_status_e       e0_status;
   logic             e0_idle;
 
+  // ---------------------------------------------------------------------------
+  // engine 1: modinv
+  // ---------------------------------------------------------------------------
   logic             e1_cmd_valid, e1_cmd_ready;
   logic [WIDTH-1:0] e1_a, e1_m;
   logic             e1_done_valid, e1_done_ready;
@@ -102,7 +107,40 @@ module gf_secure_fabric_top
   gf_status_e       e1_status;
   logic             e1_idle;
 
-  // montgomery cluster lane 0 (statically reserved to modexp engine)
+  // ---------------------------------------------------------------------------
+  // engine 2: PQC
+  // ---------------------------------------------------------------------------
+  logic             e2_cmd_valid, e2_cmd_ready;
+  logic [3:0]       e2_opcode;
+  logic [WIDTH-1:0] e2_base, e2_exp, e2_m;
+  logic             e2_done_valid, e2_done_ready;
+  logic [WIDTH-1:0] e2_result;
+  gf_status_e       e2_status;
+  logic             e2_idle;
+
+  // ---------------------------------------------------------------------------
+  // engine 3: RSA-CRT
+  // ---------------------------------------------------------------------------
+  logic             e3_cmd_valid, e3_cmd_ready;
+  logic [3:0]       e3_opcode;
+  logic [WIDTH-1:0] e3_base, e3_exp, e3_m;
+  logic             e3_done_valid, e3_done_ready;
+  logic [WIDTH-1:0] e3_result;
+  gf_status_e       e3_status;
+  logic             e3_idle;
+
+  // ---------------------------------------------------------------------------
+  // engine 4: ECC
+  // ---------------------------------------------------------------------------
+  logic             e4_cmd_valid, e4_cmd_ready;
+  logic [3:0]       e4_opcode;
+  logic [WIDTH-1:0] e4_base, e4_exp, e4_m;
+  logic             e4_done_valid, e4_done_ready;
+  logic [WIDTH-1:0] e4_result;
+  gf_status_e       e4_status;
+  logic             e4_idle;
+
+  // montgomery cluster lanes (statically reserved: lane 0 = modexp, lane 1 = RSA-CRT, lane 2 = ECC)
   logic             mc_req_valid [NUM_MULTIPLIERS];
   logic             mc_req_ready [NUM_MULTIPLIERS];
   logic [WIDTH-1:0] mc_a [NUM_MULTIPLIERS];
@@ -113,13 +151,19 @@ module gf_secure_fabric_top
   logic [WIDTH-1:0] mc_p [NUM_MULTIPLIERS];
   logic             mc_idle;
 
+  // PQC multiplier lane (dedicated, separate from Montgomery cluster)
+  logic             pqc_mul_req_valid, pqc_mul_req_ready;
+  logic [WIDTH-1:0] pqc_mul_a, pqc_mul_b, pqc_mul_m;
+  logic             pqc_mul_rsp_valid, pqc_mul_rsp_ready;
+  logic [WIDTH-1:0] pqc_mul_p;
+
   // transaction table
   logic                tt_upd_en;
   logic [SEQ_W-1:0]    tt_upd_slot;
   gf_txn_state_e       tt_upd_state;
   logic [TXN_ID_W-1:0] tt_upd_txn_id;
   gf_opcode_e          tt_upd_opcode;
-  logic [1:0]          tt_upd_engine_id;
+  logic [2:0]          tt_upd_engine_id;
   logic [SEQ_W-1:0]    tt_upd_seq;
   gf_status_e          tt_upd_status;
   logic                tt_comp_en;
@@ -250,6 +294,7 @@ module gf_secure_fabric_top
     .bank_a_i    (bank_a),
     .bank_b_i    (bank_b),
     .bank_m_i    (bank_m),
+    // engine 0: modexp
     .e0_valid_o  (e0_cmd_valid),
     .e0_ready_i  (e0_cmd_ready),
     .e0_base_o   (e0_base),
@@ -259,6 +304,7 @@ module gf_secure_fabric_top
     .e0_done_ready_o (e0_done_ready),
     .e0_result_i (e0_result),
     .e0_status_i (e0_status),
+    // engine 1: modinv
     .e1_valid_o  (e1_cmd_valid),
     .e1_ready_i  (e1_cmd_ready),
     .e1_a_o      (e1_a),
@@ -267,12 +313,48 @@ module gf_secure_fabric_top
     .e1_done_ready_o (e1_done_ready),
     .e1_result_i (e1_result),
     .e1_status_i (e1_status),
+    // engine 2: PQC
+    .e2_valid_o  (e2_cmd_valid),
+    .e2_ready_i  (e2_cmd_ready),
+    .e2_opcode_o (e2_opcode),
+    .e2_base_o   (e2_base),
+    .e2_exp_o    (e2_exp),
+    .e2_m_o      (e2_m),
+    .e2_done_valid_i (e2_done_valid),
+    .e2_done_ready_o (e2_done_ready),
+    .e2_result_i (e2_result),
+    .e2_status_i (e2_status),
+    // engine 3: RSA-CRT
+    .e3_valid_o  (e3_cmd_valid),
+    .e3_ready_i  (e3_cmd_ready),
+    .e3_opcode_o (e3_opcode),
+    .e3_base_o   (e3_base),
+    .e3_exp_o    (e3_exp),
+    .e3_m_o      (e3_m),
+    .e3_done_valid_i (e3_done_valid),
+    .e3_done_ready_o (e3_done_ready),
+    .e3_result_i (e3_result),
+    .e3_status_i (e3_status),
+    // engine 4: ECC
+    .e4_valid_o  (e4_cmd_valid),
+    .e4_ready_i  (e4_cmd_ready),
+    .e4_opcode_o (e4_opcode),
+    .e4_base_o   (e4_base),
+    .e4_exp_o    (e4_exp),
+    .e4_m_o      (e4_m),
+    .e4_done_valid_i (e4_done_valid),
+    .e4_done_ready_o (e4_done_ready),
+    .e4_result_i (e4_result),
+    .e4_status_i (e4_status),
+    // result write-back
     .res_we_o    (res_we),
     .res_bank_o  (res_bank),
     .res_data_o  (res_data),
+    // completion queue
     .cq_valid_o  (cq_in_valid),
     .cq_ready_i  (cq_in_ready),
     .cq_data_o   (cq_in),
+    // transaction table
     .tt_upd_en_o        (tt_upd_en),
     .tt_upd_slot_o      (tt_upd_slot),
     .tt_upd_state_o     (tt_upd_state),
@@ -290,7 +372,7 @@ module gf_secure_fabric_top
   );
 
   // ---------------------------------------------------------------------------
-  // engines
+  // engine 0: modexp (uses Montgomery cluster lane 0)
   // ---------------------------------------------------------------------------
   gf_modexp_engine #(
     .WIDTH          (WIDTH),
@@ -317,7 +399,10 @@ module gf_secure_fabric_top
     .idle_o   (e0_idle)
   );
 
-  gf_modinv_engine #(.WIDTH(WIDTH)) u_modinv_by_engine (
+  // ---------------------------------------------------------------------------
+  // engine 1: modinv
+  // ---------------------------------------------------------------------------
+  gf_modinv_engine #(.WIDTH(WIDTH)) u_modinv_engine (
     .clk_i, .rst_ni,
     .valid_i  (e1_cmd_valid),
     .ready_o  (e1_cmd_ready),
@@ -331,7 +416,149 @@ module gf_secure_fabric_top
   );
 
   // ---------------------------------------------------------------------------
-  // montgomery_cluster + multiplier_reservation_table (static lane map)
+  // engine 2: PQC (dedicated multiplier via gf_engine_if)
+  // ---------------------------------------------------------------------------
+  gf_engine_if #(.WIDTH(WIDTH), .EXP_W(WIDTH)) pqc_engine_if (
+    .clk_i  (clk_i),
+    .rst_ni (rst_ni)
+  );
+
+  gf_pqc_engine_wrapper #(
+    .WIDTH (WIDTH),
+    .N     (256),
+    .Q     (8380417)
+  ) u_pqc_wrapper (
+    .clk_i          (clk_i),
+    .rst_ni         (rst_ni),
+    .engine_if      (pqc_engine_if),
+    .mul_req_valid_o(pqc_mul_req_valid),
+    .mul_req_ready_i(pqc_mul_req_ready),
+    .mul_a_o        (pqc_mul_a),
+    .mul_b_o        (pqc_mul_b),
+    .mul_m_o        (pqc_mul_m),
+    .mul_rsp_valid_i(pqc_mul_rsp_valid),
+    .mul_rsp_ready_o(pqc_mul_rsp_ready),
+    .mul_p_i        (pqc_mul_p),
+    .coeff_wr_en    (),
+    .coeff_wr_addr  (),
+    .coeff_wr_data  (),
+    .coeff_rd_en    (),
+    .coeff_rd_addr  (),
+    .coeff_rd_data  ('0)
+  );
+
+  // PQC engine <-> scheduler wiring
+  assign e2_cmd_ready   = pqc_engine_if.cmd_ready;
+  assign pqc_engine_if.cmd_valid  = e2_cmd_valid;
+  assign pqc_engine_if.cmd_opcode = e2_opcode;
+  assign pqc_engine_if.cmd_txn_id = '0;
+  assign pqc_engine_if.cmd_base   = e2_base;
+  assign pqc_engine_if.cmd_exp    = e2_exp;
+  assign pqc_engine_if.cmd_m      = e2_m;
+  assign e2_done_valid  = pqc_engine_if.rsp_valid;
+  assign pqc_engine_if.rsp_ready  = e2_done_ready;
+  assign e2_result      = pqc_engine_if.rsp_result;
+  assign e2_status      = pqc_engine_if.rsp_status;
+  assign e2_idle        = pqc_engine_if.engine_idle;
+
+  // PQC multiplier lane (dedicated, not from Montgomery cluster)
+  gf_mont_mult #(.WIDTH(WIDTH)) u_pqc_mult (
+    .clk_i, .rst_ni,
+    .req_valid_i(pqc_mul_req_valid),
+    .req_ready_o(pqc_mul_req_ready),
+    .req_a_i    (pqc_mul_a),
+    .req_b_i    (pqc_mul_b),
+    .req_m_i    (pqc_mul_m),
+    .rsp_valid_o(pqc_mul_rsp_valid),
+    .rsp_ready_i(pqc_mul_rsp_ready),
+    .rsp_p_o    (pqc_mul_p)
+  );
+
+  // ---------------------------------------------------------------------------
+  // engine 3: RSA-CRT (uses Montgomery cluster lane 1)
+  // ---------------------------------------------------------------------------
+  gf_engine_if #(.WIDTH(WIDTH), .EXP_W(WIDTH)) rsa_crt_engine_if (
+    .clk_i  (clk_i),
+    .rst_ni (rst_ni)
+  );
+
+  gf_rsa_crt_engine_wrapper #(
+    .WIDTH (WIDTH),
+    .EXP_W (WIDTH)
+  ) u_rsa_crt_wrapper (
+    .clk_i          (clk_i),
+    .rst_ni         (rst_ni),
+    .engine_if      (rsa_crt_engine_if),
+    .rsa_p_i        ('0),  // TODO: connect to operand bank for RSA-CRT-specific inputs
+    .rsa_q_i        ('0),
+    .rsa_dp_i       ('0),
+    .rsa_dq_i       ('0),
+    .rsa_qinv_i     ('0),
+    .mul_req_valid_o(mc_req_valid[1]),
+    .mul_req_ready_i(mc_req_ready[1]),
+    .mul_a_o        (mc_a[1]),
+    .mul_b_o        (mc_b[1]),
+    .mul_m_o        (mc_m[1]),
+    .mul_rsp_valid_i(mc_rsp_valid[1]),
+    .mul_rsp_ready_o(mc_rsp_ready[1]),
+    .mul_p_i        (mc_p[1])
+  );
+
+  // RSA-CRT engine <-> scheduler wiring
+  assign e3_cmd_ready   = rsa_crt_engine_if.cmd_ready;
+  assign rsa_crt_engine_if.cmd_valid  = e3_cmd_valid;
+  assign rsa_crt_engine_if.cmd_opcode = e3_opcode;
+  assign rsa_crt_engine_if.cmd_txn_id = '0;
+  assign rsa_crt_engine_if.cmd_base   = e3_base;
+  assign rsa_crt_engine_if.cmd_exp    = e3_exp;
+  assign rsa_crt_engine_if.cmd_m      = e3_m;
+  assign e3_done_valid  = rsa_crt_engine_if.rsp_valid;
+  assign rsa_crt_engine_if.rsp_ready  = e3_done_ready;
+  assign e3_result      = rsa_crt_engine_if.rsp_result;
+  assign e3_status      = rsa_crt_engine_if.rsp_status;
+  assign e3_idle        = rsa_crt_engine_if.engine_idle;
+
+  // ---------------------------------------------------------------------------
+  // engine 4: ECC (uses Montgomery cluster lane 2)
+  // ---------------------------------------------------------------------------
+  gf_engine_if #(.WIDTH(WIDTH), .EXP_W(WIDTH)) ecc_engine_if (
+    .clk_i  (clk_i),
+    .rst_ni (rst_ni)
+  );
+
+  gf_ecc_engine_wrapper #(
+    .WIDTH      (WIDTH),
+    .CURVE_TYPE (0)  // X25519
+  ) u_ecc_wrapper (
+    .clk_i          (clk_i),
+    .rst_ni         (rst_ni),
+    .engine_if      (ecc_engine_if),
+    .mul_req_valid_o(mc_req_valid[2]),
+    .mul_req_ready_i(mc_req_ready[2]),
+    .mul_a_o        (mc_a[2]),
+    .mul_b_o        (mc_b[2]),
+    .mul_m_o        (mc_m[2]),
+    .mul_rsp_valid_i(mc_rsp_valid[2]),
+    .mul_rsp_ready_o(mc_rsp_ready[2]),
+    .mul_p_i        (mc_p[2])
+  );
+
+  // ECC engine <-> scheduler wiring
+  assign e4_cmd_ready   = ecc_engine_if.cmd_ready;
+  assign ecc_engine_if.cmd_valid  = e4_cmd_valid;
+  assign ecc_engine_if.cmd_opcode = e4_opcode;
+  assign ecc_engine_if.cmd_txn_id = '0;
+  assign ecc_engine_if.cmd_base   = e4_base;
+  assign ecc_engine_if.cmd_exp    = e4_exp;
+  assign ecc_engine_if.cmd_m      = e4_m;
+  assign e4_done_valid  = ecc_engine_if.rsp_valid;
+  assign ecc_engine_if.rsp_ready  = e4_done_ready;
+  assign e4_result      = ecc_engine_if.rsp_result;
+  assign e4_status      = ecc_engine_if.rsp_status;
+  assign e4_idle        = ecc_engine_if.engine_idle;
+
+  // ---------------------------------------------------------------------------
+  // montgomery_cluster (3 multiplier lanes: modexp, RSA-CRT, ECC)
   // ---------------------------------------------------------------------------
   gf_montgomery_cluster #(
     .WIDTH           (WIDTH),
@@ -388,7 +615,7 @@ module gf_secure_fabric_top
   // ---------------------------------------------------------------------------
   // idle for tool-inserted clock gating
   // ---------------------------------------------------------------------------
-  assign idle_o = e0_idle && e1_idle && mc_idle && !sched_busy
-                  && !cq_out_valid && !rf_out_valid;
+  assign idle_o = e0_idle && e1_idle && e2_idle && e3_idle && e4_idle &&
+                  mc_idle && !sched_busy && !cq_out_valid && !rf_out_valid;
 
 endmodule

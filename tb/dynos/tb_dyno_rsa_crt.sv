@@ -28,7 +28,7 @@ module tb_dyno_rsa_crt (
   logic               mul_rsp_valid, mul_rsp_ready;
 
   // RSA-CRT specific inputs (driven from cocotb)
-  logic [WIDTH-1:0]   rsa_p, rsa_q, rsa_qinv;
+  logic [WIDTH-1:0]   rsa_p, rsa_q, rsa_dp, rsa_dq, rsa_qinv;
 
   // Wrapper instantiation
   gf_rsa_crt_engine_wrapper #(
@@ -40,6 +40,8 @@ module tb_dyno_rsa_crt (
     .engine_if      (engine_if),
     .rsa_p_i        (rsa_p),
     .rsa_q_i        (rsa_q),
+    .rsa_dp_i       (rsa_dp),
+    .rsa_dq_i       (rsa_dq),
     .rsa_qinv_i     (rsa_qinv),
     .mul_req_valid_o(mul_req_valid),
     .mul_req_ready_i(mul_req_ready),

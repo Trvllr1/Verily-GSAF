@@ -37,6 +37,7 @@ module gf_rsa_crt_engine
   output logic               ready_o,
   input  logic [WIDTH-1:0]   m_i,       // message
   input  logic [WIDTH-1:0]   dp_i,      // d mod (p-1)
+  input  logic [WIDTH-1:0]   dq_i,      // d mod (q-1)
   input  logic [WIDTH-1:0]   p_i,       // prime p
   input  logic [WIDTH-1:0]   q_i,       // prime q
   input  logic [WIDTH-1:0]   qinv_i,    // q^-1 mod p
@@ -72,7 +73,7 @@ module gf_rsa_crt_engine
   state_e state_q;
 
   // ─── Operand registers ──────────────────────────────────────────────────
-  logic [WIDTH-1:0] m_q, dp_q, p_q, q_q, qinv_q;
+  logic [WIDTH-1:0] m_q, dp_q, dq_q, p_q, q_q, qinv_q;
   logic [WIDTH-1:0] s1_q, s2_q, s_q;
   logic [WIDTH-1:0] result_q;
   gf_status_e       status_q;
@@ -98,6 +99,7 @@ module gf_rsa_crt_engine
       state_q        <= S_IDLE;
       m_q            <= '0;
       dp_q           <= '0;
+      dq_q           <= '0;
       p_q            <= '0;
       q_q            <= '0;
       qinv_q         <= '0;
@@ -125,6 +127,7 @@ module gf_rsa_crt_engine
           if (valid_i) begin
             m_q    <= m_i;
             dp_q   <= dp_i;
+            dq_q   <= dq_i;
             p_q    <= p_i;
             q_q    <= q_i;
             qinv_q <= qinv_i;
@@ -152,6 +155,7 @@ module gf_rsa_crt_engine
 
           if (mul_rsp_valid_i) begin
             s1_q   <= mul_p_i;
+            mul_req_valid_o <= 1'b0;  // Deassert so next state starts fresh
             state_q <= S_MODEXP_Q;
           end
         end
@@ -159,15 +163,14 @@ module gf_rsa_crt_engine
         // ---------------------------------------------------------------
         S_MODEXP_Q: begin
           // s2 = m^dq mod q
-          // Note: dq = dp for simplicity in this implementation
-          // In production, dp and dq would be separate
           mul_req_valid_o <= 1'b1;
           mul_a_o         <= m_q;
-          mul_b_o         <= dp_q;  // would be dq_i in full implementation
+          mul_b_o         <= dq_q;
           mul_m_o         <= q_q;
 
           if (mul_rsp_valid_i) begin
             s2_q   <= mul_p_i;
+            mul_req_valid_o <= 1'b0;  // Deassert so next state starts fresh
             state_q <= S_CRT_COMBINE;
           end
         end
@@ -179,6 +182,9 @@ module gf_rsa_crt_engine
           logic [WIDTH:0] diff;
           logic [WIDTH-1:0] h;
           logic [WIDTH:0] h_times_q;
+
+          // Deassert multiplier request (CRT combine is computed inline)
+          mul_req_valid_o <= 1'b0;
 
           diff = {1'b0, s1_q} - {1'b0, s2_q};
           if (diff[WIDTH]) diff = diff + {1'b0, p_q};  // mod p
@@ -233,6 +239,7 @@ module gf_rsa_crt_engine
             // Secure wipe of sensitive data
             m_q    <= '0;
             dp_q   <= '0;
+            dq_q   <= '0;
             p_q    <= '0;
             q_q    <= '0;
             qinv_q <= '0;

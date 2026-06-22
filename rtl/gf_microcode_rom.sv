@@ -12,26 +12,26 @@ module gf_microcode_rom
 (
   input  gf_opcode_e opcode_i,
   output logic       legal_o,
-  output logic [1:0] engine_class_o   // 0 = modexp, 1 = modinv
+  output logic [2:0] engine_class_o   // 0=modexp, 1=modinv, 2=PQC, 3=RSA-CRT, 4=ECC
 );
 
   always_comb begin
     legal_o        = 1'b0;
-    engine_class_o = 2'd0;
+    engine_class_o = 3'd0;
     unique case (opcode_i)
-      OP_MODEXP: begin legal_o = 1'b1; engine_class_o = 2'd0; end
-      OP_MODINV: begin legal_o = 1'b1; engine_class_o = 2'd1; end
+      OP_MODEXP: begin legal_o = 1'b1; engine_class_o = 3'd0; end
+      OP_MODINV: begin legal_o = 1'b1; engine_class_o = 3'd1; end
       // PQC engine: forward/inverse NTT and base multiplication
-      OP_PQC:         begin legal_o = 1'b1; engine_class_o = 2'd2; end
-      OP_PQC_FWD_NTT: begin legal_o = 1'b1; engine_class_o = 2'd2; end
-      OP_PQC_INV_NTT: begin legal_o = 1'b1; engine_class_o = 2'd2; end
+      OP_PQC:         begin legal_o = 1'b1; engine_class_o = 3'd2; end
+      OP_PQC_FWD_NTT: begin legal_o = 1'b1; engine_class_o = 3'd2; end
+      OP_PQC_INV_NTT: begin legal_o = 1'b1; engine_class_o = 3'd2; end
       // RSA-CRT engine: Bellcore-attack hardened RSA private key operation
-      OP_RSA_CRT: begin legal_o = 1'b1; engine_class_o = 2'd3; end
+      OP_RSA_CRT: begin legal_o = 1'b1; engine_class_o = 3'd3; end
       // ECC engines: point operations and scalar multiplication
-      OP_ECC_PADD: begin legal_o = 1'b1; engine_class_o = 2'd4; end
-      OP_ECC_PDBL: begin legal_o = 1'b1; engine_class_o = 2'd4; end
-      OP_ED25519:  begin legal_o = 1'b1; engine_class_o = 2'd4; end
-      OP_X25519:   begin legal_o = 1'b1; engine_class_o = 2'd4; end
+      OP_ECC_PADD: begin legal_o = 1'b1; engine_class_o = 3'd4; end
+      OP_ECC_PDBL: begin legal_o = 1'b1; engine_class_o = 3'd4; end
+      OP_ED25519:  begin legal_o = 1'b1; engine_class_o = 3'd4; end
+      OP_X25519:   begin legal_o = 1'b1; engine_class_o = 3'd4; end
       default: ;
     endcase
   end

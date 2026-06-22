@@ -20,7 +20,7 @@ module gf_transaction_table
   input  gf_txn_state_e       upd_state_i,
   input  logic [TXN_ID_W-1:0] upd_txn_id_i,
   input  gf_opcode_e          upd_opcode_i,
-  input  logic [1:0]          upd_engine_id_i,
+  input  logic [2:0]          upd_engine_id_i,
   input  logic [SEQ_W-1:0]    upd_seq_i,
   input  gf_status_e          upd_status_i,
 
@@ -44,7 +44,7 @@ module gf_transaction_table
   gf_txn_state_e       state_q  [MAX_TXNS];
   logic [TXN_ID_W-1:0] txnid_q  [MAX_TXNS];
   gf_opcode_e          opc_q    [MAX_TXNS];
-  logic [1:0]          eng_q    [MAX_TXNS];
+  logic [2:0]          eng_q    [MAX_TXNS];
   logic [SEQ_W-1:0]    seq_q    [MAX_TXNS];
   gf_status_e          stat_q   [MAX_TXNS];
 

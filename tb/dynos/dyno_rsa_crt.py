@@ -20,10 +20,11 @@ from golden_model import STATUS_OK, STATUS_INVALID_INPUT
 
 
 # Pre-computed RSA-CRT test vectors: p=7, q=13, e=65537
-# d=17, dp=dq=5, qinv=6, m=5, s=31, s^e mod n = 5 = m
+# d=17, dp=5, dq=5, qinv=6, m=5, s=31, s^e mod n = 5 = m
 RSA_P  = 7
 RSA_Q  = 13
 RSA_DP = 5
+RSA_DQ = 5
 RSA_QINV = 6
 
 
@@ -37,6 +38,8 @@ async def test_rsa_crt_completes(dut):
 
     dut.rsa_p.value = RSA_P
     dut.rsa_q.value = RSA_Q
+    dut.rsa_dp.value = RSA_DP
+    dut.rsa_dq.value = RSA_DQ
     dut.rsa_qinv.value = RSA_QINV
 
     await drive_command(dut, get_opcode("rsa_crt"), 0x30, m, RSA_DP, RSA_P, 64)
@@ -56,6 +59,8 @@ async def test_rsa_crt_invalid_p(dut):
 
     dut.rsa_p.value = 0
     dut.rsa_q.value = RSA_Q
+    dut.rsa_dp.value = RSA_DP
+    dut.rsa_dq.value = RSA_DQ
     dut.rsa_qinv.value = RSA_QINV
 
     await drive_command(dut, get_opcode("rsa_crt"), 0x31, 5, RSA_DP, 0, 64)
@@ -74,6 +79,8 @@ async def test_rsa_crt_invalid_q(dut):
 
     dut.rsa_p.value = RSA_P
     dut.rsa_q.value = 0
+    dut.rsa_dp.value = RSA_DP
+    dut.rsa_dq.value = RSA_DQ
     dut.rsa_qinv.value = RSA_QINV
 
     await drive_command(dut, get_opcode("rsa_crt"), 0x32, 5, RSA_DP, RSA_P, 64)
@@ -92,6 +99,8 @@ async def test_rsa_crt_engine_completes(dut):
 
     dut.rsa_p.value = RSA_P
     dut.rsa_q.value = RSA_Q
+    dut.rsa_dp.value = RSA_DP
+    dut.rsa_dq.value = RSA_DQ
     dut.rsa_qinv.value = RSA_QINV
 
     await drive_command(dut, get_opcode("rsa_crt"), 0x33, 5, RSA_DP, RSA_P, 64)
