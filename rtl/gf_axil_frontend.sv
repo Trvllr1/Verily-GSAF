@@ -14,6 +14,11 @@
 //   0x020 PERF_CYCLES RO  busy cycle count
 //   0x024 PERF_TXNS   RO  completed transaction count
 //   0x028 PERF_STALLS RO  cycles result_fifo full (host backpressure)
+//   0x080 RSA_P      RW  [63:0] RSA-CRT prime p
+//   0x088 RSA_Q      RW  [63:0] RSA-CRT prime q
+//   0x090 RSA_DP     RW  [63:0] RSA-CRT d mod (p-1)
+//   0x098 RSA_DQ     RW  [63:0] RSA-CRT d mod (q-1)
+//   0x0A0 RSA_QINV   RW  [63:0] RSA-CRT q^-1 mod p
 //   0x100 + bank*0x40 + region*0x10 + word*4 : operand windows
 //         region 0=A(W) 1=B(W) 2=M(W) 3=RESULT(R)
 //         (layout supports WIDTH <= 128; widen stride for larger widths)
@@ -84,6 +89,13 @@ module gf_axil_frontend
   output logic              retire_o,
   output logic [SEQ_W-1:0]  retire_bank_o,
 
+  // RSA-CRT parameter outputs (written by host, consumed by RSA-CRT engine)
+  output logic [WIDTH-1:0]  rsa_p_o,
+  output logic [WIDTH-1:0]  rsa_q_o,
+  output logic [WIDTH-1:0]  rsa_dp_o,
+  output logic [WIDTH-1:0]  rsa_dq_o,
+  output logic [WIDTH-1:0]  rsa_qinv_o,
+
   // status inputs
   input  logic [MAX_TXNS-1:0] bank_free_i,
   input  logic                fabric_busy_i,
@@ -129,6 +141,18 @@ module gf_axil_frontend
   // ---------------------------------------------------------------------------
   logic [1:0]  irq_status_q, irq_enable_q;
   logic [31:0] perf_cycles_q, perf_txns_q, perf_stalls_q;
+
+  // RSA-CRT parameter registers (host-writable, 64-bit each)
+  logic [WIDTH-1:0] rsa_p_q, rsa_q_q, rsa_dp_q, rsa_dq_q, rsa_qinv_q;
+  logic             rsa_we;
+  logic [2:0]       rsa_sel;  // 0=p, 1=q, 2=dp, 3=dq, 4=qinv
+  logic             rsa_hi;   // 0=low word, 1=high word
+
+  assign rsa_p_o   = rsa_p_q;
+  assign rsa_q_o   = rsa_q_q;
+  assign rsa_dp_o  = rsa_dp_q;
+  assign rsa_dq_o  = rsa_dq_q;
+  assign rsa_qinv_o = rsa_qinv_q;
 
   assign irq_o = |(irq_status_q & irq_enable_q);
 
@@ -177,6 +201,11 @@ module gf_axil_frontend
       perf_stalls_q <= '0;
       cmd_pend_q    <= 1'b0;
       cmd_q         <= '0;
+      rsa_p_q       <= '0;
+      rsa_q_q       <= '0;
+      rsa_dp_q      <= '0;
+      rsa_dq_q      <= '0;
+      rsa_qinv_q    <= '0;
     end else begin
       // ---- AXI handshakes ----
       if (s_axil_awvalid && s_axil_awready) begin
@@ -207,6 +236,17 @@ module gf_axil_frontend
                             bank:   wdata_q[13:12]};
             cmd_pend_q <= 1'b1;
           end
+          // RSA-CRT parameter registers
+          8'h80: rsa_p_q[31:0]   <= wdata_q;
+          8'h84: rsa_p_q[63:32]  <= wdata_q;
+          8'h88: rsa_q_q[31:0]   <= wdata_q;
+          8'h8C: rsa_q_q[63:32]  <= wdata_q;
+          8'h90: rsa_dp_q[31:0]  <= wdata_q;
+          8'h94: rsa_dp_q[63:32] <= wdata_q;
+          8'h98: rsa_dq_q[31:0]  <= wdata_q;
+          8'h9C: rsa_dq_q[63:32] <= wdata_q;
+          8'hA0: rsa_qinv_q[31:0]  <= wdata_q;
+          8'hA4: rsa_qinv_q[63:32] <= wdata_q;
           default: ;
         endcase
       end
@@ -241,6 +281,17 @@ module gf_axil_frontend
             8'h20: s_axil_rdata <= perf_cycles_q;
             8'h24: s_axil_rdata <= perf_txns_q;
             8'h28: s_axil_rdata <= perf_stalls_q;
+            // RSA-CRT parameter readback
+            8'h80: s_axil_rdata <= rsa_p_q[31:0];
+            8'h84: s_axil_rdata <= rsa_p_q[63:32];
+            8'h88: s_axil_rdata <= rsa_q_q[31:0];
+            8'h8C: s_axil_rdata <= rsa_q_q[63:32];
+            8'h90: s_axil_rdata <= rsa_dp_q[31:0];
+            8'h94: s_axil_rdata <= rsa_dp_q[63:32];
+            8'h98: s_axil_rdata <= rsa_dq_q[31:0];
+            8'h9C: s_axil_rdata <= rsa_dq_q[63:32];
+            8'hA0: s_axil_rdata <= rsa_qinv_q[31:0];
+            8'hA4: s_axil_rdata <= rsa_qinv_q[63:32];
             default: s_axil_rdata <= 32'hDEAD_BEEF;
           endcase
         end

@@ -178,6 +178,9 @@ module gf_secure_fabric_top
   logic [MAX_TXNS-1:0] bank_free;
   logic                sched_busy;
 
+  // RSA-CRT parameters from frontend registers
+  logic [WIDTH-1:0]    rsa_p, rsa_q, rsa_dp, rsa_dq, rsa_qinv;
+
   // ---------------------------------------------------------------------------
   // axi_frontend (includes irq_controller + performance_counter_block)
   // ---------------------------------------------------------------------------
@@ -208,6 +211,11 @@ module gf_secure_fabric_top
     .hr_data_i     (hr_data),
     .retire_o      (retire),
     .retire_bank_o (retire_bank),
+    .rsa_p_o       (rsa_p),
+    .rsa_q_o       (rsa_q),
+    .rsa_dp_o      (rsa_dp),
+    .rsa_dq_o      (rsa_dq),
+    .rsa_qinv_o    (rsa_qinv),
     .bank_free_i   (bank_free),
     .fabric_busy_i (sched_busy),
     .result_fifo_full_i (!rf_in_ready)
@@ -489,11 +497,11 @@ module gf_secure_fabric_top
     .clk_i          (clk_i),
     .rst_ni         (rst_ni),
     .engine_if      (rsa_crt_engine_if),
-    .rsa_p_i        ('0),  // TODO: connect to operand bank for RSA-CRT-specific inputs
-    .rsa_q_i        ('0),
-    .rsa_dp_i       ('0),
-    .rsa_dq_i       ('0),
-    .rsa_qinv_i     ('0),
+    .rsa_p_i        (rsa_p),
+    .rsa_q_i        (rsa_q),
+    .rsa_dp_i       (rsa_dp),
+    .rsa_dq_i       (rsa_dq),
+    .rsa_qinv_i     (rsa_qinv),
     .mul_req_valid_o(mc_req_valid[1]),
     .mul_req_ready_i(mc_req_ready[1]),
     .mul_a_o        (mc_a[1]),
