@@ -59,7 +59,8 @@ module gf_ecc_engine
   logic [WIDTH-1:0] t0_q, t1_q;
   logic [WIDTH-1:0] t2_q, t3_q;
   logic [WIDTH-1:0] t4_q, t5_q;
-  logic [8:0]       bit_cnt_q;
+  localparam int unsigned BIT_CNT_W = $clog2(WIDTH);
+  logic [BIT_CNT_W-1:0] bit_cnt_q;
   logic [1:0]       step_q;
 
   logic [1:0]       done_cnt_q;
@@ -124,8 +125,8 @@ module gf_ecc_engine
         S_CLAMP: begin
           scalar_q <= (base_i & ~({{(WIDTH-3){1'b0}}, 3'b111})
                            & ~({{1'b1}, {(WIDTH-1){1'b0}}}))
-                      | ({{(WIDTH-1){1'b0}}, 1'b1} << 254);
-          bit_cnt_q <= 9'd254;
+                      | ({{(WIDTH-1){1'b0}}, 1'b1} << (WIDTH > 8 ? 254 : WIDTH-1));
+          bit_cnt_q <= BIT_CNT_W'(WIDTH-2);
           step_q    <= 2'd0;
           state_q   <= S_LADDER_SQ0;
         end
@@ -199,15 +200,15 @@ module gf_ecc_engine
             // Constant-time conditional swap
             begin
               logic [WIDTH-1:0] x0_new, x1_new, final_x0;
-              x0_new  = scalar_q[bit_cnt_q[7:0]] ? mul_p_i : x_0_q;
-              x1_new  = scalar_q[bit_cnt_q[7:0]] ? x_0_q   : mul_p_i;
-              final_x0 = (bit_cnt_q == 9'd0) ? x0_new : x_0_q;
+              x0_new  = scalar_q[BIT_CNT_W'(bit_cnt_q)] ? mul_p_i : x_0_q;
+              x1_new  = scalar_q[BIT_CNT_W'(bit_cnt_q)] ? x_0_q   : mul_p_i;
+              final_x0 = (bit_cnt_q == '0) ? x0_new : x_0_q;
               x_0_q   <= x0_new;
               x_1_q   <= x1_new;
               result_q <= final_x0;
             end
 
-            if (bit_cnt_q == 9'd0) begin
+            if (bit_cnt_q == '0) begin
               state_q <= S_DONE;
             end else begin
               bit_cnt_q <= bit_cnt_q - 1'b1;

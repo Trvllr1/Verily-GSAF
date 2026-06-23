@@ -234,3 +234,230 @@ async def test_rsa_crt_basic(dut):
     await collect(dut, 0x10, STATUS_OK, 31, width, words)
 
     dut._log.info(f"RSA-CRT({m}, p={p}, q={q}) = 31 [PASS]")
+
+
+# =============================================================================
+# Expanded test coverage — larger values, edge cases, multi-bank
+# =============================================================================
+
+@cocotb.test()
+async def test_modexp_large(dut):
+    """ModExp with larger values: 7^256 mod 999999937 (prime)"""
+    width = int(os.environ.get("WIDTH", "64"))
+    words = width // 32
+
+    clock = Clock(dut.clk_i, 10, units="ns")
+    cocotb.start_soon(clock.start())
+    dut.s_axil_awvalid.value = 0
+    dut.s_axil_wvalid.value = 0
+    dut.s_axil_bready.value = 0
+    dut.s_axil_arvalid.value = 0
+    dut.s_axil_rready.value = 0
+    await reset(dut)
+
+    a, e, m = 7, 256, 999999937
+    expected = modexp(a, e, m, width)
+
+    await load_operand(dut, 0, 0, a, words, width)
+    await load_operand(dut, 0, 1, e, words, width)
+    await load_operand(dut, 0, 2, m, words, width)
+    await submit(dut, 0, 0x0, 0x04)
+    await collect(dut, 0x04, STATUS_OK, expected, width, words)
+
+    dut._log.info(f"ModExp({a}^{e} mod {m}) = {expected} [PASS]")
+
+
+@cocotb.test()
+async def test_modexp_identity(dut):
+    """ModExp identity: a^1 mod m = a mod m"""
+    width = int(os.environ.get("WIDTH", "64"))
+    words = width // 32
+
+    clock = Clock(dut.clk_i, 10, units="ns")
+    cocotb.start_soon(clock.start())
+    dut.s_axil_awvalid.value = 0
+    dut.s_axil_wvalid.value = 0
+    dut.s_axil_bready.value = 0
+    dut.s_axil_arvalid.value = 0
+    dut.s_axil_rready.value = 0
+    await reset(dut)
+
+    a, e, m = 42, 1, 97
+    expected = modexp(a, e, m, width)
+
+    await load_operand(dut, 0, 0, a, words, width)
+    await load_operand(dut, 0, 1, e, words, width)
+    await load_operand(dut, 0, 2, m, words, width)
+    await submit(dut, 0, 0x0, 0x05)
+    await collect(dut, 0x05, STATUS_OK, expected, width, words)
+
+    dut._log.info(f"ModExp({a}^{e} mod {m}) = {expected} [PASS]")
+
+
+@cocotb.test()
+async def test_modexp_zero_exponent(dut):
+    """ModExp: a^0 mod m = 1 mod m"""
+    width = int(os.environ.get("WIDTH", "64"))
+    words = width // 32
+
+    clock = Clock(dut.clk_i, 10, units="ns")
+    cocotb.start_soon(clock.start())
+    dut.s_axil_awvalid.value = 0
+    dut.s_axil_wvalid.value = 0
+    dut.s_axil_bready.value = 0
+    dut.s_axil_arvalid.value = 0
+    dut.s_axil_rready.value = 0
+    await reset(dut)
+
+    a, e, m = 5, 0, 997
+    expected = modexp(a, e, m, width)
+
+    await load_operand(dut, 0, 0, a, words, width)
+    await load_operand(dut, 0, 1, e, words, width)
+    await load_operand(dut, 0, 2, m, words, width)
+    await submit(dut, 0, 0x0, 0x06)
+    await collect(dut, 0x06, STATUS_OK, expected, width, words)
+
+    dut._log.info(f"ModExp({a}^{e} mod {m}) = {expected} [PASS]")
+
+
+@cocotb.test()
+async def test_modinv_large(dut):
+    """ModInv with larger prime: 123456789^-1 mod 1000000007"""
+    width = int(os.environ.get("WIDTH", "64"))
+    words = width // 32
+
+    clock = Clock(dut.clk_i, 10, units="ns")
+    cocotb.start_soon(clock.start())
+    dut.s_axil_awvalid.value = 0
+    dut.s_axil_wvalid.value = 0
+    dut.s_axil_bready.value = 0
+    dut.s_axil_arvalid.value = 0
+    dut.s_axil_rready.value = 0
+    await reset(dut)
+
+    a, m = 123456789, 1000000007
+    _, expected = modinv_divsteps(a, m, width)
+
+    await load_operand(dut, 0, 0, a, words, width)
+    await load_operand(dut, 0, 1, 0, words, width)
+    await load_operand(dut, 0, 2, m, words, width)
+    await submit(dut, 0, 0x1, 0x07)
+    await collect(dut, 0x07, STATUS_OK, expected, width, words)
+
+    dut._log.info(f"ModInv({a} mod {m}) = {expected} [PASS]")
+
+
+@cocotb.test()
+async def test_modinv_one(dut):
+    """ModInv: 1^-1 mod m = 1 for any m"""
+    width = int(os.environ.get("WIDTH", "64"))
+    words = width // 32
+
+    clock = Clock(dut.clk_i, 10, units="ns")
+    cocotb.start_soon(clock.start())
+    dut.s_axil_awvalid.value = 0
+    dut.s_axil_wvalid.value = 0
+    dut.s_axil_bready.value = 0
+    dut.s_axil_arvalid.value = 0
+    dut.s_axil_rready.value = 0
+    await reset(dut)
+
+    a, m = 1, 999983
+    _, expected = modinv_divsteps(a, m, width)
+
+    await load_operand(dut, 0, 0, a, words, width)
+    await load_operand(dut, 0, 1, 0, words, width)
+    await load_operand(dut, 0, 2, m, words, width)
+    await submit(dut, 0, 0x1, 0x08)
+    await collect(dut, 0x08, STATUS_OK, expected, width, words)
+
+    dut._log.info(f"ModInv({a} mod {m}) = {expected} [PASS]")
+
+
+@cocotb.test()
+async def test_rsa_crt_medium(dut):
+    """RSA-CRT with medium primes: p=104729, q=104743, m=42"""
+    width = int(os.environ.get("WIDTH", "64"))
+    words = width // 32
+
+    clock = Clock(dut.clk_i, 10, units="ns")
+    cocotb.start_soon(clock.start())
+    dut.s_axil_awvalid.value = 0
+    dut.s_axil_wvalid.value = 0
+    dut.s_axil_bready.value = 0
+    dut.s_axil_arvalid.value = 0
+    dut.s_axil_rready.value = 0
+    await reset(dut)
+
+    p, q = 104729, 104743
+    n = p * q
+    e = 65537
+    d = pow(e, -1, (p-1)*(q-1))
+    dp = d % (p - 1)
+    dq = d % (q - 1)
+    qinv = pow(q, -1, p)
+    m = 42
+
+    await write_rsa_param(dut, RSA_P_ADDR, p, width)
+    await write_rsa_param(dut, RSA_Q_ADDR, q, width)
+    await write_rsa_param(dut, RSA_DP_ADDR, dp, width)
+    await write_rsa_param(dut, RSA_DQ_ADDR, dq, width)
+    await write_rsa_param(dut, RSA_QINV_ADDR, qinv, width)
+
+    await load_operand(dut, 0, 0, m, words, width)
+    await load_operand(dut, 0, 2, n, words, width)
+
+    await submit(dut, 0, 0xC, 0x09)
+
+    # Compute expected signature
+    s1 = pow(m, dp, p)
+    s2 = pow(m, dq, q)
+    h = (qinv * (s1 - s2)) % p
+    expected = s2 + q * h
+
+    await collect(dut, 0x09, STATUS_OK, expected, width, words)
+
+    dut._log.info(f"RSA-CRT({m}, p={p}, q={q}) = {expected} [PASS]")
+
+
+@cocotb.test()
+async def test_multi_bank(dut):
+    """Run modexp on bank 0, then modinv on bank 1 — test bank isolation"""
+    width = int(os.environ.get("WIDTH", "64"))
+    words = width // 32
+
+    clock = Clock(dut.clk_i, 10, units="ns")
+    cocotb.start_soon(clock.start())
+    dut.s_axil_awvalid.value = 0
+    dut.s_axil_wvalid.value = 0
+    dut.s_axil_bready.value = 0
+    dut.s_axil_arvalid.value = 0
+    dut.s_axil_rready.value = 0
+    await reset(dut)
+
+    # Bank 0: modexp 2^8 mod 101 = 256 mod 101 = 54
+    a, e, m = 2, 8, 101
+    expected_exp = modexp(a, e, m, width)
+
+    await load_operand(dut, 0, 0, a, words, width)
+    await load_operand(dut, 0, 1, e, words, width)
+    await load_operand(dut, 0, 2, m, words, width)
+
+    # Bank 1: modinv 5^-1 mod 11 = 9 (since 5*9=45=1 mod 11)
+    a2, m2 = 5, 11
+    _, expected_inv = modinv_divsteps(a2, m2, width)
+
+    await load_operand(dut, 1, 0, a2, words, width)
+    await load_operand(dut, 1, 1, 0, words, width)
+    await load_operand(dut, 1, 2, m2, words, width)
+
+    # Submit both
+    await submit(dut, 0, 0x0, 0x0A)
+    await submit(dut, 1, 0x1, 0x0B)
+
+    # Collect both — fabric is OOO, modinv completes before modexp
+    resp1 = await collect(dut, 0x0B, STATUS_OK, expected_inv, width, words)
+    resp2 = await collect(dut, 0x0A, STATUS_OK, expected_exp, width, words)
+
+    dut._log.info(f"Multi-bank: modexp={expected_exp}, modinv={expected_inv} [PASS]")
