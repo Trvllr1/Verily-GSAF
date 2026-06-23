@@ -461,3 +461,187 @@ async def test_multi_bank(dut):
     resp2 = await collect(dut, 0x0A, STATUS_OK, expected_exp, width, words)
 
     dut._log.info(f"Multi-bank: modexp={expected_exp}, modinv={expected_inv} [PASS]")
+
+
+# =============================================================================
+# Randomized / constrained-random testing
+# =============================================================================
+
+import random
+random.seed(42)  # deterministic for reproducibility
+
+
+@cocotb.test()
+async def test_modexp_random(dut):
+    """Randomized ModExp: 5 random valid (a, e, m) triples"""
+    width = int(os.environ.get("WIDTH", "64"))
+    words = width // 32
+
+    clock = Clock(dut.clk_i, 10, units="ns")
+    cocotb.start_soon(clock.start())
+    dut.s_axil_awvalid.value = 0
+    dut.s_axil_wvalid.value = 0
+    dut.s_axil_bready.value = 0
+    dut.s_axil_arvalid.value = 0
+    dut.s_axil_rready.value = 0
+    await reset(dut)
+
+    # Generate 5 random valid triples (a < m, m odd)
+    for i in range(5):
+        m = random.randrange(3, 1 << min(width, 32), 2)  # odd, fits in 32 bits
+        a = random.randrange(1, m)
+        e = random.randrange(0, min(width, 32))
+        expected = modexp(a, e, m, width)
+
+        await load_operand(dut, 0, 0, a, words, width)
+        await load_operand(dut, 0, 1, e, words, width)
+        await load_operand(dut, 0, 2, m, words, width)
+        await submit(dut, 0, 0x0, 0x20 + i)
+        await collect(dut, 0x20 + i, STATUS_OK, expected, width, words)
+
+    dut._log.info(f"ModExp random: 5 cases all PASS")
+
+
+@cocotb.test()
+async def test_modinv_random(dut):
+    """Randomized ModInv: 5 random valid (a, m) pairs with gcd(a,m)=1"""
+    width = int(os.environ.get("WIDTH", "64"))
+    words = width // 32
+
+    clock = Clock(dut.clk_i, 10, units="ns")
+    cocotb.start_soon(clock.start())
+    dut.s_axil_awvalid.value = 0
+    dut.s_axil_wvalid.value = 0
+    dut.s_axil_bready.value = 0
+    dut.s_axil_arvalid.value = 0
+    dut.s_axil_rready.value = 0
+    await reset(dut)
+
+    import math
+    for i in range(5):
+        # Generate random prime-ish modulus (odd, >1)
+        m = random.randrange(3, 1 << min(width, 32), 2)
+        # Find a coprime to m
+        a = random.randrange(1, m)
+        while math.gcd(a, m) != 1:
+            a = random.randrange(1, m)
+
+        _, expected = modinv_divsteps(a, m, width)
+
+        await load_operand(dut, 0, 0, a, words, width)
+        await load_operand(dut, 0, 1, 0, words, width)
+        await load_operand(dut, 0, 2, m, words, width)
+        await submit(dut, 0, 0x1, 0x30 + i)
+        await collect(dut, 0x30 + i, STATUS_OK, expected, width, words)
+
+    dut._log.info(f"ModInv random: 5 cases all PASS")
+
+
+@cocotb.test()
+async def test_rsa_crt_random(dut):
+    """Randomized RSA-CRT: 3 random messages with fixed small primes"""
+    width = int(os.environ.get("WIDTH", "64"))
+    words = width // 32
+
+    clock = Clock(dut.clk_i, 10, units="ns")
+    cocotb.start_soon(clock.start())
+    dut.s_axil_awvalid.value = 0
+    dut.s_axil_wvalid.value = 0
+    dut.s_axil_bready.value = 0
+    dut.s_axil_arvalid.value = 0
+    dut.s_axil_rready.value = 0
+    await reset(dut)
+
+    # Fixed medium primes
+    p, q = 104729, 104743
+    n = p * q
+    e = 65537
+    d = pow(e, -1, (p-1)*(q-1))
+    dp = d % (p - 1)
+    dq = d % (q - 1)
+    qinv = pow(q, -1, p)
+
+    await write_rsa_param(dut, RSA_P_ADDR, p, width)
+    await write_rsa_param(dut, RSA_Q_ADDR, q, width)
+    await write_rsa_param(dut, RSA_DP_ADDR, dp, width)
+    await write_rsa_param(dut, RSA_DQ_ADDR, dq, width)
+    await write_rsa_param(dut, RSA_QINV_ADDR, qinv, width)
+
+    for i in range(3):
+        m = random.randrange(2, n)
+        s1 = pow(m, dp, p)
+        s2 = pow(m, dq, q)
+        h = (qinv * (s1 - s2)) % p
+        expected = s2 + q * h
+
+        await load_operand(dut, 0, 0, m, words, width)
+        await load_operand(dut, 0, 2, n, words, width)
+        await submit(dut, 0, 0xC, 0x40 + i)
+        await collect(dut, 0x40 + i, STATUS_OK, expected, width, words)
+
+    dut._log.info(f"RSA-CRT random: 3 cases all PASS")
+
+
+@cocotb.test()
+async def test_modexp_random_multi_bank(dut):
+    """Randomized ModExp across all 4 banks simultaneously"""
+    width = int(os.environ.get("WIDTH", "64"))
+    words = width // 32
+
+    clock = Clock(dut.clk_i, 10, units="ns")
+    cocotb.start_soon(clock.start())
+    dut.s_axil_awvalid.value = 0
+    dut.s_axil_wvalid.value = 0
+    dut.s_axil_bready.value = 0
+    dut.s_axil_arvalid.value = 0
+    dut.s_axil_rready.value = 0
+    await reset(dut)
+
+    results = []
+    for bank in range(4):
+        m = random.randrange(3, 1 << min(width, 32), 2)
+        a = random.randrange(1, m)
+        e = random.randrange(1, min(width, 32))
+        expected = modexp(a, e, m, width)
+        results.append((bank, expected))
+
+        await load_operand(dut, bank, 0, a, words, width)
+        await load_operand(dut, bank, 1, e, words, width)
+        await load_operand(dut, bank, 2, m, words, width)
+
+    # Submit all 4
+    for bank in range(4):
+        await submit(dut, bank, 0x0, 0x50 + bank)
+
+    # Collect all 4 (OOO order)
+    collected = {}
+    for _ in range(4):
+        guard = 0
+        while True:
+            resp = await axi_read(dut, 0x014)
+            if resp & 0x80000000:
+                break
+            guard += 1
+            if guard > 500000:
+                raise TestFailure("Timeout waiting for multi-bank result")
+            await RisingEdge(dut.clk_i)
+
+        txn = resp & 0xFF
+        status = (resp >> 14) & 0x7
+        bnk = (resp >> 12) & 0x3
+        assert status == STATUS_OK, f"bank {bnk} status: got {status}"
+
+        result = 0
+        for w in range(words):
+            word = await axi_read(dut, 0x100 + bnk * 0x40 + 0x30 + w * 4)
+            result |= (word << (w * 32))
+
+        collected[bnk] = result
+        await axi_write(dut, 0x018, 1)
+
+    # Verify all results
+    for bank, expected in results:
+        got = collected[bank]
+        assert got == expected, f"bank {bank}: got {got:#x} want {expected:#x}"
+
+    dut._log.info(f"ModExp random 4-bank: all PASS")
