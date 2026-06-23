@@ -472,14 +472,15 @@ module gf_secure_fabric_top
   // PQC multiplier lane (dedicated, not from Montgomery cluster)
   gf_mont_mult #(.WIDTH(WIDTH)) u_pqc_mult (
     .clk_i, .rst_ni,
-    .req_valid_i(pqc_mul_req_valid),
-    .req_ready_o(pqc_mul_req_ready),
-    .req_a_i    (pqc_mul_a),
-    .req_b_i    (pqc_mul_b),
-    .req_m_i    (pqc_mul_m),
-    .rsp_valid_o(pqc_mul_rsp_valid),
-    .rsp_ready_i(pqc_mul_rsp_ready),
-    .rsp_p_o    (pqc_mul_p)
+    .valid_i   (pqc_mul_req_valid),
+    .ready_o   (pqc_mul_req_ready),
+    .a_i       (pqc_mul_a),
+    .b_i       (pqc_mul_b),
+    .m_i       (pqc_mul_m),
+    .valid_o   (pqc_mul_rsp_valid),
+    .ready_i   (pqc_mul_rsp_ready),
+    .p_o       (pqc_mul_p),
+    .idle_o    ()
   );
 
   // ---------------------------------------------------------------------------

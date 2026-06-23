@@ -1,6 +1,6 @@
 """
-cocotb smoke test for GSAF — mirrors tb_gsaf_smoke.sv Phase 1
-Validates functional correctness of ModExp/ModInv against the golden model.
+cocotb smoke test for GSAF — validates full fabric through AXI4-Lite chassis
+Tests ModExp, ModInv, and RSA-CRT against golden model.
 """
 import cocotb
 from cocotb.clock import Clock
@@ -110,7 +110,7 @@ async def test_modexp_basic(dut):
 
     await reset(dut)
 
-    a, e, m = 2, 10, 1000
+    a, e, m = 2, 10, 1001
     expected = modexp(a, e, m, width)
 
     await load_operand(dut, 0, 0, a, words, width)
@@ -175,3 +175,62 @@ async def test_invalid_modulus(dut):
     await collect(dut, 0x03, STATUS_INVALID_INPUT, 0, width, words)
 
     dut._log.info("Invalid modulus (m=0) correctly rejected [PASS]")
+
+
+# RSA-CRT register addresses
+RSA_P_ADDR   = 0x080
+RSA_Q_ADDR   = 0x088
+RSA_DP_ADDR  = 0x090
+RSA_DQ_ADDR  = 0x098
+RSA_QINV_ADDR = 0x0A0
+
+
+async def write_rsa_param(dut, addr, value, width=64):
+    """Write a 64-bit RSA-CRT parameter to two 32-bit registers."""
+    await axi_write(dut, addr, value & 0xFFFFFFFF)
+    await axi_write(dut, addr + 4, (value >> 32) & 0xFFFFFFFF)
+
+
+@cocotb.test()
+async def test_rsa_crt_basic(dut):
+    """RSA-CRT through full chassis: sign m=5 with p=7, q=13, verify result"""
+    width = int(os.environ.get("WIDTH", "64"))
+    words = width // 32
+
+    clock = Clock(dut.clk_i, 10, units="ns")
+    cocotb.start_soon(clock.start())
+
+    dut.s_axil_awvalid.value = 0
+    dut.s_axil_wvalid.value = 0
+    dut.s_axil_bready.value = 0
+    dut.s_axil_arvalid.value = 0
+    dut.s_axil_rready.value = 0
+
+    await reset(dut)
+
+    # RSA-CRT parameters: p=7, q=13, dp=5, dq=5, qinv=6, m=5
+    # Expected: s = 31 (RSA signature), s^e mod n = 5 = m
+    p, q, dp, dq, qinv, m = 7, 13, 5, 5, 6, 5
+
+    # Write RSA-CRT parameters to registers
+    await write_rsa_param(dut, RSA_P_ADDR, p, width)
+    await write_rsa_param(dut, RSA_Q_ADDR, q, width)
+    await write_rsa_param(dut, RSA_DP_ADDR, dp, width)
+    await write_rsa_param(dut, RSA_DQ_ADDR, dq, width)
+    await write_rsa_param(dut, RSA_QINV_ADDR, qinv, width)
+
+    # Load message into operand bank A (region 0)
+    await load_operand(dut, 0, 0, m, words, width)
+
+    # Load dummy modulus into region 2 (scheduler checks it even for RSA-CRT)
+    await load_operand(dut, 0, 2, q * p, words, width)
+
+    # Submit RSA-CRT command (opcode 0xC)
+    await submit(dut, 0, 0xC, 0x10)
+
+    # Collect result — RSA-CRT returns the signature s
+    # The engine computes s = CRT(m, dp, dq, p, q, qinv)
+    # For our parameters: s = 31
+    await collect(dut, 0x10, STATUS_OK, 31, width, words)
+
+    dut._log.info(f"RSA-CRT({m}, p={p}, q={q}) = 31 [PASS]")

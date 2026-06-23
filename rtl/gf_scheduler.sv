@@ -200,17 +200,17 @@ module gf_scheduler
 
   assign e2_valid_o = dispatch_ok && (uc_class == 3'd2);
   assign e2_base_o  = bank_a_i;
-  assign e2_exp_o   = bank_b_i;
+  assign e2_exp_o   = bank_b_i[WIDTH-1:0];
   assign e2_m_o     = bank_m_i;
 
   assign e3_valid_o = dispatch_ok && (uc_class == 3'd3);
   assign e3_base_o  = bank_a_i;
-  assign e3_exp_o   = bank_b_i;
+  assign e3_exp_o   = bank_b_i[WIDTH-1:0];
   assign e3_m_o     = bank_m_i;
 
   assign e4_valid_o = dispatch_ok && (uc_class == 3'd4);
   assign e4_base_o  = bank_a_i;
-  assign e4_exp_o   = bank_b_i;
+  assign e4_exp_o   = bank_b_i[WIDTH-1:0];
   assign e4_m_o     = bank_m_i;
 
   // opcode passthrough for engines that need sub-opcode decoding

@@ -1,49 +1,40 @@
-# cocotb testbench Makefile for GSAF
+# GSAF smoke test Makefile
 # Run from tb/ directory: make SIM=verilator
 
-PYTHON ?= python
-COCOTB_CONFIG ?= cocotb-config
-
-# Simulator selection
 SIM ?= verilator
 
-# Verilator settings
+COMPILE_ARGS += -I../rtl
 ifeq ($(SIM),verilator)
     COMPILE_ARGS += --timing
-    COMPILE_ARGS += -DGF_ASSERTIONS
-    COMPILE_ARGS += -f ../sim/gsaf.f
-    TOPLEVEL_LANG = verilog
-    VERILOG_SOURCES = $(shell cat ../sim/gsaf.f)
 endif
 
-# Icarus Verilog settings
-ifeq ($(SIM),icarus)
-    COMPILE_ARGS += -g2012
-    COMPILE_ARGS += -DGF_ASSERTIONS
-    COMPILE_ARGS += -f ../sim/gsaf.f
-    TOPLEVEL_LANG = verilog
-    VERILOG_SOURCES = $(shell cat ../sim/gsaf.f)
-endif
+VERILOG_SOURCES = \
+    ../rtl/gf_pkg.sv \
+    ../rtl/gf_fifo.sv \
+    ../rtl/gf_mont_mult.sv \
+    ../rtl/gf_montgomery_cluster.sv \
+    ../rtl/gf_modexp_engine.sv \
+    ../rtl/gf_modinv_engine.sv \
+    ../rtl/gf_pqc_engine.sv \
+    ../rtl/gf_rsa_crt_engine.sv \
+    ../rtl/gf_ecc_engine.sv \
+    ../rtl/gf_modexp_engine_wrapper.sv \
+    ../rtl/gf_modinv_engine_wrapper.sv \
+    ../rtl/gf_pqc_engine_wrapper.sv \
+    ../rtl/gf_rsa_crt_engine_wrapper.sv \
+    ../rtl/gf_ecc_engine_wrapper.sv \
+    ../rtl/gf_microcode_rom.sv \
+    ../rtl/gf_operand_banks.sv \
+    ../rtl/gf_transaction_table.sv \
+    ../rtl/gf_scheduler.sv \
+    ../rtl/gf_completion_queue.sv \
+    ../rtl/gf_reorder_buffer.sv \
+    ../rtl/gf_axil_frontend.sv \
+    ../rtl/gf_secure_fabric_top.sv
 
-# Test module
+TOPLEVEL = gf_secure_fabric_top
 MODULE = test_gsaf_smoke
 
-# Top-level
-TOPLEVEL = gf_secure_fabric_top
+COCOTB_MAKEFILES = $(shell cocotb-config --makefiles 2>/dev/null || python3 -c "import cocotb,os;p=os.path.join(os.path.dirname(cocotb.__file__),'share');print(p if os.path.exists(os.path.join(p,'Makefile.sim')) else os.path.join(p,'makefiles'))")
 
-# Parameters
-TOPLEVEL_LANG = verilog
-
-# Include paths
-INCLUDE_DIRS = ../rtl ../tb
-
-# cocotb makefile
-include $(shell $(COCOTB_CONFIG) --makefiles)/Makefile.sim
-
-.PHONY: test clean
-
-test:
-	$(MAKE) sim
-
-clean:
-	rm -rf sim_build results.xml __pycache__
+include $(COCOTB_MAKEFILES)/Makefile.sim

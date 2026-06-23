@@ -249,7 +249,7 @@ module gf_ecc_engine
             mul_req_valid_o <= 1'b0;
 
             // Conditionally swap x_0 and x_1 based on scalar bit
-            if (scalar_q[bit_cnt_q[8:0]]) begin
+            if (scalar_q[bit_cnt_q[5:0]]) begin
               x_0_q <= mul_p_i;          // x_0 gets old x_1
               // x_1 gets old x_0 which we stored in x_0_q before
               // Actually, we need to swap properly
