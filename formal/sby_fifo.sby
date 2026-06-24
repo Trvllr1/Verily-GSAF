@@ -9,7 +9,7 @@ read -sv gf_fifo.sv
 prep -top gf_fifo
 
 [engines]
-smtbmc
+smtbmc z3
 
 [files]
 rtl/gf_pkg.sv
