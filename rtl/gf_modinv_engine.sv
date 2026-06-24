@@ -118,7 +118,7 @@ module gf_modinv_engine #(
       m_q      <= '0;
       cnt_q    <= '0;
       result_q <= '0;
-      status_q <= STATUS_OK;
+      status_q <= '0;  // STATUS_OK = 0
     end else begin
       case (state_q)
         S_IDLE: if (valid_i) begin
@@ -151,16 +151,16 @@ module gf_modinv_engine #(
           // corrupted state) and must never yield a silent wrong answer
           if (g_q != '0) begin
             result_q <= '0;
-            status_q <= STATUS_FAULT;
+            status_q <= gf_pkg::STATUS_FAULT;
           end else if (f_is_p1) begin
             result_q <= v_q;
-            status_q <= STATUS_OK;
+            status_q <= gf_pkg::STATUS_OK;
           end else if (f_is_m1) begin
             result_q <= neg_v_fix[WIDTH-1:0];
-            status_q <= STATUS_OK;
+            status_q <= gf_pkg::STATUS_OK;
           end else begin
             result_q <= '0;
-            status_q <= STATUS_NOT_INVERTIBLE;
+            status_q <= gf_pkg::STATUS_NOT_INVERTIBLE;
           end
           state_q <= S_DONE;
         end

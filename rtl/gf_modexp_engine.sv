@@ -20,8 +20,8 @@
 // identically (4 squarings + multiply by Montgomery '1').
 //
 // Fault countermeasures: sparse FSM state encoding (illegal state traps to
-// DONE with STATUS_FAULT) and a result range check (result < m) that turns
-// glitched arithmetic into STATUS_FAULT instead of a silent wrong answer.
+// DONE with gf_pkg::STATUS_FAULT) and a result range check (result < m) that turns
+// glitched arithmetic into gf_pkg::STATUS_FAULT instead of a silent wrong answer.
 //
 // Multiplier access is via a statically reserved lane (request/response
 // valid/ready). The lane is owned for the full transaction: fixed latency,
@@ -69,7 +69,7 @@ module gf_modexp_engine #(
 
   // Sparse state encoding: minimum pairwise Hamming distance 3; any
   // glitch-induced illegal state value falls into the default arm and
-  // completes with STATUS_FAULT (no silent corruption, no deadlock).
+  // completes with gf_pkg::STATUS_FAULT (no silent corruption, no deadlock).
   typedef enum logic [5:0] {
     IDLE       = 6'b000000,
     MON_IN     = 6'b000111,
@@ -176,7 +176,7 @@ module gf_modexp_engine #(
       stp_cnt_q         <= '0;
       mul_inflight_q    <= 1'b0;
       monin_mul_phase_q <= 1'b0;
-      status_q          <= STATUS_OK;
+      status_q          <= gf_pkg::STATUS_OK;
       for (int i = 0; i < TBL_ENTRIES; i++) table_q[i] <= '0;
     end else begin
       case (state_q)
@@ -184,7 +184,7 @@ module gf_modexp_engine #(
         IDLE: if (valid_i) begin
           exp_q             <= exp_i;
           m_q               <= m_i;
-          status_q          <= STATUS_OK;
+      status_q          <= '0;  // STATUS_OK = 0
           table_q[1]        <= base_i;            // parked for MON_IN multiply
           dbl_q             <= (m_i == {{(WIDTH-1){1'b0}},1'b1}) ? '0
                                : {{(WIDTH-1){1'b0}}, 1'b1};      // x = 1 (m>1)
@@ -256,7 +256,7 @@ module gf_modexp_engine #(
             // fault countermeasure: glitched arithmetic cannot produce a
             // silently wrong in-range answer pattern we accept blindly --
             // any out-of-range result is flagged
-            if (mul_p_i >= m_q) status_q <= STATUS_FAULT;
+            if (mul_p_i >= m_q) status_q <= gf_pkg::STATUS_FAULT;
             state_q        <= DONE;
           end
         end
@@ -267,9 +267,9 @@ module gf_modexp_engine #(
           exp_q <= '0;
           for (int i = 0; i < TBL_ENTRIES; i++) table_q[i] <= '0;
         end
-        // fault trap: illegal (glitched) state completes with STATUS_FAULT
+        // fault trap: illegal (glitched) state completes with gf_pkg::STATUS_FAULT
         default: begin
-          status_q <= STATUS_FAULT;
+          status_q <= gf_pkg::STATUS_FAULT;
           acc_q    <= '0;
           state_q  <= DONE;
         end
