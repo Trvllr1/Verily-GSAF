@@ -49,12 +49,12 @@ sim:
 
 # ─── Formal verification (SymbiYosys) ────────────────────────────────────────
 formal:
-	$(SBY) -f formal/sby_fabric.sby prove
+	$(SBY) -f formal/sby_fabric.sby
 	@echo "Formal proof complete."
 
 formal-engine:
-	$(SBY) -f formal/sby_modexp_const.sby prove
-	$(SBY) -f formal/sby_modinv_const.sby prove
+	$(SBY) -f formal/sby_modexp_const.sby
+	$(SBY) -f formal/sby_modinv_const.sby
 	@echo "Engine formal proofs complete."
 
 # ─── Vector generation ───────────────────────────────────────────────────────

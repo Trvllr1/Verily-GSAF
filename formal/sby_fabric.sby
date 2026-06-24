@@ -10,6 +10,14 @@ read -sv gf_mont_mult.sv
 read -sv gf_montgomery_cluster.sv
 read -sv gf_modexp_engine.sv
 read -sv gf_modinv_engine.sv
+read -sv gf_pqc_engine.sv
+read -sv gf_rsa_crt_engine.sv
+read -sv gf_ecc_engine.sv
+read -sv gf_modexp_engine_wrapper.sv
+read -sv gf_modinv_engine_wrapper.sv
+read -sv gf_pqc_engine_wrapper.sv
+read -sv gf_rsa_crt_engine_wrapper.sv
+read -sv gf_ecc_engine_wrapper.sv
 read -sv gf_microcode_rom.sv
 read -sv gf_operand_banks.sv
 read -sv gf_transaction_table.sv
@@ -31,6 +39,14 @@ rtl/gf_mont_mult.sv
 rtl/gf_montgomery_cluster.sv
 rtl/gf_modexp_engine.sv
 rtl/gf_modinv_engine.sv
+rtl/gf_pqc_engine.sv
+rtl/gf_rsa_crt_engine.sv
+rtl/gf_ecc_engine.sv
+rtl/gf_modexp_engine_wrapper.sv
+rtl/gf_modinv_engine_wrapper.sv
+rtl/gf_pqc_engine_wrapper.sv
+rtl/gf_rsa_crt_engine_wrapper.sv
+rtl/gf_ecc_engine_wrapper.sv
 rtl/gf_microcode_rom.sv
 rtl/gf_operand_banks.sv
 rtl/gf_transaction_table.sv

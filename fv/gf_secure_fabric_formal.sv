@@ -2,20 +2,20 @@
 // gf_secure_fabric_formal - Formal verification top module
 // Copyright (c) 2026 Verily. All rights reserved.
 //
-// This module instantiates the GSAF fabric and binds the formal properties.
-// Used by SymbiYosys for formal verification of fabric-level properties.
+// Instantiates the GSAF fabric with WIDTH=8 for tractable proof.
+// SVA properties verify: no deadlock, no FIFO overflow, exactly one
+// completion per transaction, no duplicate txn_id, legal status encoding.
 // =============================================================================
 `include "gf_pkg.sv"
 
 module gf_secure_fabric_formal
   import gf_pkg::*;
 #(
-  parameter int unsigned WIDTH = 8  // Use small width for formal
+  parameter int unsigned WIDTH = 8
 ) (
   input logic clk_i,
   input logic rst_ni,
 
-  // AXI4-Lite slave interface
   input  logic        s_axil_awvalid,
   output logic        s_axil_awready,
   input  logic [11:0] s_axil_awaddr,
@@ -37,6 +37,8 @@ module gf_secure_fabric_formal
   output logic        irq_o,
   output logic        idle_o
 );
+
+  localparam int unsigned EXP_W = WIDTH;
 
   // ─── DUT instantiation ──────────────────────────────────────────────────
   gf_secure_fabric_top #(
@@ -68,37 +70,50 @@ module gf_secure_fabric_formal
     .idle_o         (idle_o)
   );
 
-  // ─── Formal properties ──────────────────────────────────────────────────
-  // These are the same properties from gf_fabric_props.sv, inlined here
-  // for SymbiYosys compatibility.
+  // ─── Internal signal taps ───────────────────────────────────────────────
+  // Command FIFO output (scheduler input)
+  wire        cmdf_out_valid = u_dut.cmdf_out_valid;
+  wire        cmdf_out_ready = u_dut.cmdf_out_ready;
+  wire gf_cmd_t cmdf_out     = u_dut.cmdf_out;
 
+  // Completion queue
+  wire        cq_in_valid = u_dut.cq_in_valid;
+  wire        cq_in_ready = u_dut.cq_in_ready;
+  wire gf_completion_t cq_in = u_dut.cq_in;
+
+  // Result FIFO
+  wire        rf_out_valid = u_dut.rf_out_valid;
+  wire        rf_out_ready = u_dut.rf_out_ready;
+  wire gf_completion_t rf_out = u_dut.rf_out;
+
+  // Transaction table
+  wire gf_txn_state_e  tt_state [MAX_TXNS];
+  wire [TXN_ID_W-1:0] tt_txn_id [MAX_TXNS];
+
+  genvar s;
+  for (s = 0; s < MAX_TXNS; s++) begin : g_tt_taps
+    assign tt_state[s] = u_dut.tt_state[s];
+    assign tt_txn_id[s] = u_dut.tt_txn_id[s];
+  end
+
+  // ─── Formal properties ──────────────────────────────────────────────────
   default clocking cb @(posedge clk_i); endclocking
   default disable iff (!rst_ni);
 
-  // Internal signals for properties
-  logic        cmdf_out_valid, cmdf_out_ready;
-  gf_cmd_t     cmdf_out;
-  logic        cq_in_valid, cq_in_ready;
-  gf_completion_t cq_in;
-  logic        rf_out_valid, rf_out_ready;
-  gf_completion_t rf_out;
-  gf_txn_state_e  tt_state [MAX_TXNS];
-  logic [TXN_ID_W-1:0] tt_txn_id [MAX_TXNS];
-
-  // ─── P1: No FIFO overflow ───────────────────────────────────────────────
+  // P1: No FIFO overflow (credit-based, completion queue)
   a_cq_no_overflow: assert property (cq_in_valid |-> s_eventually cq_in_ready);
 
-  // ─── P2: Exactly one completion per transaction ─────────────────────────
-  for (genvar s = 0; s < MAX_TXNS; s++) begin : g_one_completion
+  // P2: Exactly one completion per transaction
+  for (genvar s2 = 0; s2 < MAX_TXNS; s2++) begin : g_one_completion
     a_complete_then_free: assert property (
-      (tt_state[s] == TXN_COMPLETE) |->
-        (tt_state[s] == TXN_COMPLETE) until_with (tt_state[s] == TXN_FREE));
+      (tt_state[s2] == TXN_COMPLETE) |->
+        (tt_state[s2] == TXN_COMPLETE) until_with (tt_state[s2] == TXN_FREE));
     a_no_skip_states: assert property (
-      (tt_state[s] == TXN_FREE) |=>
-        (tt_state[s] inside {TXN_FREE, TXN_LOADED, TXN_RUNNING, TXN_COMPLETE}));
+      (tt_state[s2] == TXN_FREE) |=>
+        (tt_state[s2] inside {TXN_FREE, TXN_LOADED, TXN_RUNNING, TXN_COMPLETE}));
   end
 
-  // ─── P3: No duplicate txn_id ───────────────────────────────────────────
+  // P3: No duplicate txn_id among in-flight transactions
   for (genvar i = 0; i < MAX_TXNS; i++) begin : g_dup_i
     for (genvar j = 0; j < MAX_TXNS; j++) begin : g_dup_j
       if (i < j) begin : g_pair
@@ -109,13 +124,13 @@ module gf_secure_fabric_formal
     end
   end
 
-  // ─── P4: No deadlock / eventual forward progress ────────────────────────
+  // P4: No deadlock / eventual forward progress
   asm_host_fair: assume property (rf_out_valid |-> s_eventually rf_out_ready);
   a_forward_progress: assert property (
     (cmdf_out_valid && cmdf_out_ready) |-> s_eventually
       (rf_out_valid && rf_out.txn_id == $past(cmdf_out.txn_id)));
 
-  // ─── P5: Completion record integrity ────────────────────────────────────
+  // P5: Completion record integrity — legal status encoding
   a_legal_status: assert property (cq_in_valid |->
     cq_in.status inside {STATUS_OK, STATUS_INVALID_INPUT,
                          STATUS_NOT_INVERTIBLE, STATUS_UNSUPPORTED,
