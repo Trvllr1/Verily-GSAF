@@ -10,7 +10,7 @@ read -sv gf_modinv_engine.sv
 prep -top gf_modinv_engine
 
 [engines]
-smtbmc
+smtbmc z3
 
 [files]
 rtl/gf_pkg.sv

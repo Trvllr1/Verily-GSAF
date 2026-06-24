@@ -17,9 +17,7 @@
 // =============================================================================
 `include "gf_pkg.sv"
 
-module gf_modinv_engine
-  import gf_pkg::*;
-#(
+module gf_modinv_engine #(
   parameter int unsigned WIDTH         = gf_pkg::GF_WIDTH_DEFAULT,
   parameter int unsigned DIVSTEP_BOUND = gf_pkg::GF_DIVSTEP_BOUND_64  // Use pre-computed value
 ) (
@@ -36,7 +34,7 @@ module gf_modinv_engine
   output logic               valid_o,
   input  logic               ready_i,
   output logic [WIDTH-1:0]   result_o,
-  output gf_status_e         status_o,
+  output gf_pkg::gf_status_e         status_o,
 
   output logic               idle_o
 );
@@ -55,7 +53,7 @@ module gf_modinv_engine
   logic [WIDTH-1:0]          m_q;
   logic [CNT_W-1:0]          cnt_q;
   logic [WIDTH-1:0]          result_q;
-  gf_status_e                status_q;
+  gf_pkg::gf_status_e                status_q;
 
   // ---------------------------------------------------------------------------
   // one divstep, both paths computed, mux select = (delta > 0) && g odd
@@ -85,7 +83,7 @@ module gf_modinv_engine
                                                 input logic [WIDTH-1:0] m);
     logic [WIDTH+1:0] t;
     t = x[0] ? ({1'b0, x} + {2'b00, m}) : {1'b0, x};
-    return t[WIDTH:1];
+    half_mod = t[WIDTH:1];
   endfunction
 
   logic [WIDTH-1:0] r_next;
@@ -122,7 +120,7 @@ module gf_modinv_engine
       result_q <= '0;
       status_q <= STATUS_OK;
     end else begin
-      unique case (state_q)
+      case (state_q)
         S_IDLE: if (valid_i) begin
           delta_q <= DW'(1);
           f_q     <= {2'b00, m_i};

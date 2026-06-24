@@ -29,9 +29,7 @@
 // =============================================================================
 `include "gf_pkg.sv"
 
-module gf_modexp_engine
-  import gf_pkg::*;
-#(
+module gf_modexp_engine #(
   parameter int unsigned WIDTH          = gf_pkg::GF_WIDTH_DEFAULT,
   parameter int unsigned WINDOW_SIZE    = 4,
   parameter int unsigned EXP_BLIND_BITS = 64,
@@ -51,7 +49,7 @@ module gf_modexp_engine
   output logic               valid_o,
   input  logic               ready_i,
   output logic [WIDTH-1:0]   result_o,
-  output gf_status_e         status_o,
+  output gf_pkg::gf_status_e         status_o,
 
   // reserved multiplier lane
   output logic               mul_req_valid_o,
@@ -85,7 +83,7 @@ module gf_modexp_engine
   // operand registers
   logic [EXP_W-1:0] exp_q;
   logic [WIDTH-1:0] m_q;
-  gf_status_e       status_q;
+  gf_pkg::gf_status_e       status_q;
   // Montgomery constants
   logic [WIDTH-1:0] dbl_q;       // doubling accumulator -> R mod m -> R^2 mod m
   logic [WIDTH-1:0] rmod_q;      // R mod m (Montgomery '1')
@@ -127,7 +125,7 @@ module gf_modexp_engine
   always_comb begin
     mul_a_o = acc_q;
     mul_b_o = acc_q;
-    unique case (state_q)
+    case (state_q)
       MON_IN:     begin mul_a_o = table_q[1]; mul_b_o = r2_q; end // base_m = mont(base, R^2)
       PRECOMPUTE: begin mul_a_o = table_q[tbl_cnt_q - 1'b1]; mul_b_o = table_q[1]; end
       EXP_LOOP:   begin
@@ -140,7 +138,8 @@ module gf_modexp_engine
   end
   assign mul_m_o = m_q;
 
-  assign mul_req_valid_o = (state_q inside {MON_IN, PRECOMPUTE, EXP_LOOP, MON_OUT})
+  assign mul_req_valid_o = (state_q == MON_IN || state_q == PRECOMPUTE ||
+                            state_q == EXP_LOOP || state_q == MON_OUT)
                            && !mul_inflight_q && mul_gate;
   assign mul_rsp_ready_o = 1'b1;
 
@@ -180,7 +179,7 @@ module gf_modexp_engine
       status_q          <= STATUS_OK;
       for (int i = 0; i < TBL_ENTRIES; i++) table_q[i] <= '0;
     end else begin
-      unique case (state_q)
+      case (state_q)
         // -------------------------------------------------------------------
         IDLE: if (valid_i) begin
           exp_q             <= exp_i;
