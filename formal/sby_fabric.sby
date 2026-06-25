@@ -1,58 +1,14 @@
 [options]
-mode prove
+mode bmc
 depth 20
 multiclock on
 
 [script]
-read -sv gf_pkg.sv
-read -sv gf_fifo.sv
-read -sv gf_mont_mult.sv
-read -sv gf_montgomery_cluster.sv
-read -sv gf_modexp_engine.sv
-read -sv gf_modinv_engine.sv
-read -sv gf_pqc_engine.sv
-read -sv gf_rsa_crt_engine.sv
-read -sv gf_ecc_engine.sv
-read -sv gf_modexp_engine_wrapper.sv
-read -sv gf_modinv_engine_wrapper.sv
-read -sv gf_pqc_engine_wrapper.sv
-read -sv gf_rsa_crt_engine_wrapper.sv
-read -sv gf_ecc_engine_wrapper.sv
-read -sv gf_microcode_rom.sv
-read -sv gf_operand_banks.sv
-read -sv gf_transaction_table.sv
-read -sv gf_scheduler.sv
-read -sv gf_completion_queue.sv
-read -sv gf_reorder_buffer.sv
-read -sv gf_axil_frontend.sv
-read -sv gf_secure_fabric_top.sv
-read -sv gf_secure_fabric_formal.sv
-prep -top gf_secure_fabric_formal
+read -sv gf_fabric_formal_full.sv
+prep -top gf_fabric_formal_full
 
 [engines]
-smtbmc
+smtbmc z3
 
 [files]
-rtl/gf_pkg.sv
-rtl/gf_fifo.sv
-rtl/gf_mont_mult.sv
-rtl/gf_montgomery_cluster.sv
-rtl/gf_modexp_engine.sv
-rtl/gf_modinv_engine.sv
-rtl/gf_pqc_engine.sv
-rtl/gf_rsa_crt_engine.sv
-rtl/gf_ecc_engine.sv
-rtl/gf_modexp_engine_wrapper.sv
-rtl/gf_modinv_engine_wrapper.sv
-rtl/gf_pqc_engine_wrapper.sv
-rtl/gf_rsa_crt_engine_wrapper.sv
-rtl/gf_ecc_engine_wrapper.sv
-rtl/gf_microcode_rom.sv
-rtl/gf_operand_banks.sv
-rtl/gf_transaction_table.sv
-rtl/gf_scheduler.sv
-rtl/gf_completion_queue.sv
-rtl/gf_reorder_buffer.sv
-rtl/gf_axil_frontend.sv
-rtl/gf_secure_fabric_top.sv
-fv/gf_secure_fabric_formal.sv
+formal/gf_fabric_formal_full.sv
