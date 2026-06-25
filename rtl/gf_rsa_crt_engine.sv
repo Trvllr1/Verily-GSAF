@@ -8,7 +8,6 @@
 `include "gf_pkg.sv"
 
 module gf_rsa_crt_engine
-  import gf_pkg::*;
 #(
   parameter int unsigned WIDTH = gf_pkg::GF_WIDTH_DEFAULT,
   parameter int unsigned EXP_W = WIDTH
@@ -28,7 +27,7 @@ module gf_rsa_crt_engine
   output logic               valid_o,
   input  logic               ready_i,
   output logic [WIDTH-1:0]   result_o,
-  output gf_status_e         status_o,
+  output gf_pkg::gf_status_e         status_o,
 
   output logic               mul_req_valid_o,
   input  logic               mul_req_ready_i,
@@ -67,7 +66,7 @@ module gf_rsa_crt_engine
   logic [WIDTH-1:0] m_q, dp_q, dq_q, p_q, q_q, qinv_q;
   logic [WIDTH-1:0] s1_q, s2_q, s_q;
   logic [WIDTH-1:0] result_q;
-  gf_status_e       status_q;
+  gf_pkg::gf_status_e       status_q;
 
   logic [WIDTH-1:0] dbl_q;
   logic [WIDTH-1:0] rmod_q;
@@ -96,7 +95,7 @@ module gf_rsa_crt_engine
   always_comb begin
     mul_a_o = acc_q;
     mul_b_o = acc_q;
-    unique case (state_q)
+    case (state_q)
       S_MON_IN:  begin mul_a_o = base_q; mul_b_o = dbl_q; end
       S_EXP_SQ:  begin mul_a_o = acc_q;  mul_b_o = acc_q; end
       S_EXP_MUL: begin mul_a_o = acc_q;  mul_b_o = base_m_q; end
@@ -106,7 +105,8 @@ module gf_rsa_crt_engine
   end
   assign mul_m_o = mod_q;
 
-  assign mul_req_valid_o = (state_q inside {S_MON_IN, S_EXP_SQ, S_EXP_MUL, S_MON_OUT})
+  assign mul_req_valid_o = (state_q == S_MON_IN || state_q == S_EXP_SQ ||
+                            state_q == S_EXP_MUL || state_q == S_MON_OUT)
                            && !mul_inflight_q;
   assign mul_rsp_ready_o = 1'b1;
 
@@ -123,7 +123,7 @@ module gf_rsa_crt_engine
       m_q <= '0; dp_q <= '0; dq_q <= '0;
       p_q <= '0; q_q  <= '0; qinv_q <= '0;
       s1_q <= '0; s2_q <= '0; s_q <= '0;
-      result_q <= '0; status_q <= STATUS_OK;
+      result_q <= '0; status_q <= gf_pkg::STATUS_OK;
       dbl_q <= '0; rmod_q <= '0;
       acc_q <= '0; base_m_q <= '0; base_q <= '0;
       mod_q <= '0; exp_q <= '0;
@@ -133,17 +133,17 @@ module gf_rsa_crt_engine
       if (mul_req_valid_o && mul_req_ready_i) mul_inflight_q <= 1'b1;
       if (mul_rsp_valid_i)                    mul_inflight_q <= 1'b0;
 
-      unique case (state_q)
+      case (state_q)
         // ================================================================
         S_IDLE: begin
           if (valid_i) begin
             m_q    <= m_i;  dp_q <= dp_i; dq_q <= dq_i;
             p_q    <= p_i;  q_q  <= q_i;  qinv_q <= qinv_i;
-            status_q <= STATUS_OK;
+            status_q <= gf_pkg::STATUS_OK;
 
             if (p_i == '0 || q_i == '0 || p_i == q_i) begin
               result_q <= '0;
-              status_q <= STATUS_INVALID_INPUT;
+              status_q <= gf_pkg::STATUS_INVALID_INPUT;
               state_q  <= S_DONE;
             end else begin
               phase_q   <= PHASE_S1;
@@ -211,19 +211,19 @@ module gf_rsa_crt_engine
         // ================================================================
         S_MON_OUT: begin
           if (mul_rsp_valid_i) begin
-            if (mul_p_i >= mod_q) status_q <= STATUS_FAULT;
+            if (mul_p_i >= mod_q) status_q <= gf_pkg::STATUS_FAULT;
             state_q <= S_NEXT_PHASE;
-            unique case (phase_q)
+            case (phase_q)
               PHASE_S1:  s1_q <= mul_p_i;
               PHASE_S2:  s2_q <= mul_p_i;
               PHASE_CRT: begin
                 // Verify: check s^e mod n == m (Bellcore hardening)
                 if (mul_p_i != m_q) begin
                   result_q <= '0;
-                  status_q <= STATUS_FAULT;
+                  status_q <= gf_pkg::STATUS_FAULT;
                 end else begin
                   result_q <= s_q;
-                  status_q <= STATUS_OK;
+                  status_q <= gf_pkg::STATUS_OK;
                 end
               end
               default: ;
@@ -233,7 +233,7 @@ module gf_rsa_crt_engine
 
         // ================================================================
         S_NEXT_PHASE: begin
-          unique case (phase_q)
+          case (phase_q)
             PHASE_S1: begin
               phase_q   <= PHASE_S2;
               mod_q     <= q_q;
@@ -301,7 +301,7 @@ module gf_rsa_crt_engine
         end
 
         default: begin
-          status_q <= STATUS_FAULT;
+          status_q <= gf_pkg::STATUS_FAULT;
           result_q <= '0;
           state_q  <= S_DONE;
         end

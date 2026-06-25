@@ -181,6 +181,19 @@ module gf_secure_fabric_top
   // RSA-CRT parameters from frontend registers
   logic [WIDTH-1:0]    rsa_p, rsa_q, rsa_dp, rsa_dq, rsa_qinv;
 
+  // PQC coefficient memory — frontend load port
+  logic                coeff_ld_we;
+  logic [7:0]          coeff_ld_addr;
+  logic [WIDTH-1:0]    coeff_ld_data;
+
+  // PQC coefficient memory — engine read/write port (from wrapper)
+  logic                eng_coeff_wr_en;
+  logic [7:0]          eng_coeff_wr_addr;
+  logic [WIDTH-1:0]    eng_coeff_wr_data;
+  logic                eng_coeff_rd_en;
+  logic [7:0]          eng_coeff_rd_addr;
+  logic [WIDTH-1:0]    eng_coeff_rd_data;
+
   // ---------------------------------------------------------------------------
   // axi_frontend (includes irq_controller + performance_counter_block)
   // ---------------------------------------------------------------------------
@@ -216,6 +229,9 @@ module gf_secure_fabric_top
     .rsa_dp_o      (rsa_dp),
     .rsa_dq_o      (rsa_dq),
     .rsa_qinv_o    (rsa_qinv),
+    .coeff_we_o    (coeff_ld_we),
+    .coeff_addr_o  (coeff_ld_addr),
+    .coeff_data_o  (coeff_ld_data),
     .bank_free_i   (bank_free),
     .fabric_busy_i (sched_busy),
     .result_fifo_full_i (!rf_in_ready)
@@ -447,13 +463,31 @@ module gf_secure_fabric_top
     .mul_rsp_valid_i(pqc_mul_rsp_valid),
     .mul_rsp_ready_o(pqc_mul_rsp_ready),
     .mul_p_i        (pqc_mul_p),
-    .coeff_wr_en    (),
-    .coeff_wr_addr  (),
-    .coeff_wr_data  (),
-    .coeff_rd_en    (),
-    .coeff_rd_addr  (),
-    .coeff_rd_data  ('0)
+    .coeff_wr_en    (eng_coeff_wr_en),
+    .coeff_wr_addr  (eng_coeff_wr_addr),
+    .coeff_wr_data  (eng_coeff_wr_data),
+    .coeff_rd_en    (eng_coeff_rd_en),
+    .coeff_rd_addr  (eng_coeff_rd_addr),
+    .coeff_rd_data  (eng_coeff_rd_data)
   );
+
+  // PQC coefficient memory (256 x WIDTH-bit, dual-port)
+  // Port A: frontend load (write-only, before NTT starts)
+  // Port B: engine read/write (during NTT computation)
+  // No contention: frontend loads first, then engine runs.
+  logic [WIDTH-1:0] coeff_mem [0:255];
+
+  always_ff @(posedge clk_i) begin
+    // Port A: frontend load writes
+    if (coeff_ld_we)
+      coeff_mem[coeff_ld_addr] <= coeff_ld_data;
+    // Port B: engine writes (NTT result storage)
+    if (eng_coeff_wr_en)
+      coeff_mem[eng_coeff_wr_addr] <= eng_coeff_wr_data;
+  end
+
+  // Port B: engine reads
+  assign eng_coeff_rd_data = coeff_mem[eng_coeff_rd_addr];
 
   // PQC engine <-> scheduler wiring
   assign e2_cmd_ready   = pqc_engine_if.cmd_ready;

@@ -19,7 +19,6 @@
 `include "gf_pkg.sv"
 
 module gf_pqc_engine
-  import gf_pkg::*;
 #(
   parameter int unsigned WIDTH = 23,
   parameter int unsigned N     = 256,
@@ -38,7 +37,7 @@ module gf_pqc_engine
   output logic               valid_o,
   input  logic               ready_i,
   output logic [WIDTH-1:0]   result_o,
-  output gf_status_e         status_o,
+  output gf_pkg::gf_status_e   status_o,
 
   output logic               mul_req_valid_o,
   input  logic               mul_req_ready_i,
@@ -225,7 +224,7 @@ module gf_pqc_engine
   assign ready_o  = (state_q == S_IDLE);
   assign valid_o  = (state_q == S_DONE);
   assign idle_o   = (state_q == S_IDLE);
-  assign status_o = STATUS_OK;
+  assign status_o = gf_pkg::STATUS_OK;
   assign mul_rsp_ready_o = 1'b1;
 
   // ─── Coefficient memory control ─────────────────────────────────────────
@@ -261,14 +260,14 @@ module gf_pqc_engine
       coeff_wr_en <= 1'b0;
       mul_req_valid_o <= 1'b0;
 
-      unique case (state_q)
+      case (state_q)
         // ---------------------------------------------------------------
         S_IDLE: begin
           if (valid_i) begin
             idx_q      <= '0;
             layer_q    <= '0;
             t_q        <= LG_N'(N/2);  // initial span = N/2
-            fwd_mode_q <= (opcode_i == OP_PQC_FWD_NTT);
+            fwd_mode_q <= (opcode_i == 4'hE);  // OP_PQC_FWD_NTT
             mod_q      <= m_i;         // modulus
             state_q    <= S_READ_U;
           end

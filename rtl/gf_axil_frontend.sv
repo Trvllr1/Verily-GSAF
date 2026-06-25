@@ -96,6 +96,11 @@ module gf_axil_frontend
   output logic [WIDTH-1:0]  rsa_dq_o,
   output logic [WIDTH-1:0]  rsa_qinv_o,
 
+  // PQC coefficient memory write port (register-mapped, host loads NTT coefficients)
+  output logic              coeff_we_o,
+  output logic [7:0]        coeff_addr_o,
+  output logic [WIDTH-1:0]  coeff_data_o,
+
   // status inputs
   input  logic [MAX_TXNS-1:0] bank_free_i,
   input  logic                fabric_busy_i,
@@ -154,6 +159,17 @@ module gf_axil_frontend
   assign rsa_dq_o  = rsa_dq_q;
   assign rsa_qinv_o = rsa_qinv_q;
 
+  // PQC coefficient memory write port (auto-incrementing load)
+  // Write to 0x200: store zero-extended 32-bit value at coeff_ptr, increment
+  // Write to 0x204: reset coeff_ptr to 0
+  logic [7:0] coeff_ptr_q;
+  logic [WIDTH-1:0] coeff_data_q;
+  logic coeff_we_q;
+
+  assign coeff_we_o   = coeff_we_q;
+  assign coeff_addr_o = coeff_ptr_q;
+  assign coeff_data_o = coeff_data_q;
+
   assign irq_o = |(irq_status_q & irq_enable_q);
 
   // command push: held until accepted (cmd_ready_i is STATUS-visible to SW)
@@ -206,6 +222,9 @@ module gf_axil_frontend
       rsa_dp_q      <= '0;
       rsa_dq_q      <= '0;
       rsa_qinv_q    <= '0;
+      coeff_we_q    <= 1'b0;
+      coeff_ptr_q   <= '0;
+      coeff_data_q  <= '0;
     end else begin
       // ---- AXI handshakes ----
       if (s_axil_awvalid && s_axil_awready) begin
@@ -249,6 +268,19 @@ module gf_axil_frontend
           8'hA4: rsa_qinv_q[63:32] <= wdata_q;
           default: ;
         endcase
+      end
+
+      // PQC coefficient load: auto-incrementing pointer
+      // 0x200: store zero-extended 32-bit value, advance pointer
+      // 0x204: reset pointer to 0
+      coeff_we_q <= 1'b0;
+      if (wr_do && awaddr_q == 12'h200) begin
+        coeff_we_q   <= 1'b1;
+        coeff_data_q <= {{(WIDTH-32){1'b0}}, wdata_q};
+        coeff_ptr_q  <= coeff_ptr_q + 1'b1;
+      end
+      if (wr_do && awaddr_q == 12'h204) begin
+        coeff_ptr_q <= '0;
       end
       if (cmd_pend_q && cmd_ready_i) cmd_pend_q <= 1'b0;
 

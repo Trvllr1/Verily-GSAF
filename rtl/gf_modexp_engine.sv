@@ -184,7 +184,7 @@ module gf_modexp_engine #(
         IDLE: if (valid_i) begin
           exp_q             <= exp_i;
           m_q               <= m_i;
-      status_q          <= '0;  // STATUS_OK = 0
+      status_q          <= gf_pkg::STATUS_OK;
           table_q[1]        <= base_i;            // parked for MON_IN multiply
           dbl_q             <= (m_i == {{(WIDTH-1){1'b0}},1'b1}) ? '0
                                : {{(WIDTH-1){1'b0}}, 1'b1};      // x = 1 (m>1)

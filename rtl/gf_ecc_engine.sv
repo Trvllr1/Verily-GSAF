@@ -8,7 +8,6 @@
 `include "gf_pkg.sv"
 
 module gf_ecc_engine
-  import gf_pkg::*;
 #(
   parameter int unsigned WIDTH = 255,
   parameter int unsigned CURVE_TYPE = 0
@@ -26,7 +25,7 @@ module gf_ecc_engine
   output logic               valid_o,
   input  logic               ready_i,
   output logic [WIDTH-1:0]   result_o,
-  output gf_status_e         status_o,
+  output gf_pkg::gf_status_e         status_o,
 
   output logic               mul_req_valid_o,
   input  logic               mul_req_ready_i,
@@ -53,7 +52,7 @@ module gf_ecc_engine
 
   logic [WIDTH-1:0] scalar_q;
   logic [WIDTH-1:0] result_q;
-  gf_status_e       status_q;
+  gf_pkg::gf_status_e       status_q;
 
   logic [WIDTH-1:0] x_0_q, x_1_q;
   logic [WIDTH-1:0] t0_q, t1_q;
@@ -81,7 +80,7 @@ module gf_ecc_engine
       state_q        <= S_IDLE;
       scalar_q       <= '0;
       result_q       <= '0;
-      status_q       <= STATUS_OK;
+      status_q       <= gf_pkg::STATUS_OK;
       x_0_q          <= '0;
       x_1_q          <= '0;
       t0_q           <= '0;
@@ -98,34 +97,34 @@ module gf_ecc_engine
       mul_b_o        <= '0;
       mul_m_o        <= '0;
     end else begin
-      unique case (state_q)
+      case (state_q)
         S_IDLE: begin
           if (valid_i) begin
-            status_q <= STATUS_OK;
-            unique case (opcode_i)
-              OP_X25519: begin
+            status_q <= gf_pkg::STATUS_OK;
+            case (opcode_i)
+              4'hB: begin  // OP_X25519
                 x_0_q <= exp_i;
                 x_1_q <= '0;
                 x_1_q[0] <= 1'b1;
                 state_q <= S_CLAMP;
               end
-              OP_ECC_PADD, OP_ECC_PDBL, OP_ED25519: begin
-                status_q <= STATUS_UNSUPPORTED;
+              4'h8, 4'h9, 4'hA: begin  // OP_ECC_PADD, OP_ECC_PDBL, OP_ED25519
+                status_q <= gf_pkg::STATUS_UNSUPPORTED;
                 state_q  <= S_DONE;
               end
               default: begin
-                status_q <= STATUS_UNSUPPORTED;
+                status_q <= gf_pkg::STATUS_UNSUPPORTED;
                 state_q  <= S_DONE;
               end
             endcase
           end
         end
 
-        // RFC 7748 clamping: clear bits 0-2, set bit 254, clear bit 255
+        // RFC 7748 clamping: clear bits 0-2, set bit WIDTH-2, clear bit WIDTH-1
         S_CLAMP: begin
           scalar_q <= (base_i & ~({{(WIDTH-3){1'b0}}, 3'b111})
                            & ~({{1'b1}, {(WIDTH-1){1'b0}}}))
-                      | ({{(WIDTH-1){1'b0}}, 1'b1} << (WIDTH > 8 ? 254 : WIDTH-1));
+                      | ({{(WIDTH-1){1'b0}}, 1'b1} << (WIDTH-2));
           bit_cnt_q <= BIT_CNT_W'(WIDTH-2);
           step_q    <= 2'd0;
           state_q   <= S_LADDER_SQ0;

@@ -118,7 +118,7 @@ module gf_modinv_engine #(
       m_q      <= '0;
       cnt_q    <= '0;
       result_q <= '0;
-      status_q <= '0;  // STATUS_OK = 0
+      status_q <= gf_pkg::STATUS_OK;
     end else begin
       case (state_q)
         S_IDLE: if (valid_i) begin

@@ -1,0 +1,16 @@
+[options]
+mode prove
+depth 50
+multiclock on
+
+[script]
+read -sv gf_pkg.sv
+read -sv gf_pqc_engine.sv
+prep -top gf_pqc_engine
+
+[engines]
+smtbmc z3
+
+[files]
+rtl/gf_pkg.sv
+rtl/gf_pqc_engine.sv

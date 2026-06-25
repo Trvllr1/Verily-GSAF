@@ -55,6 +55,9 @@ formal:
 formal-engine:
 	$(SBY) -f formal/sby_modexp_const.sby
 	$(SBY) -f formal/sby_modinv_const.sby
+	$(SBY) -f formal/sby_ecc_const.sby
+	$(SBY) -f formal/sby_pqc_const.sby
+	$(SBY) -f formal/sby_rsa_crt_const.sby
 	@echo "Engine formal proofs complete."
 
 # ─── Vector generation ───────────────────────────────────────────────────────
