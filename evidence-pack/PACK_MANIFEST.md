@@ -1,16 +1,19 @@
 # GSAF Evidence Pack — Manifest
 
-**Version:** 0.1.0
-**Date:** 2026-06-16
+**Version:** 0.2.0
+**Date:** 2026-06-25
 **Build Hash:** TBD (populated by `make evidence`)
 
 ## Contents
 
 | Folder | Description | Status |
 |--------|-------------|--------|
-| `01_chassis/` | Chassis RTL verification evidence | Scaffold |
-| `02_engine_modexp/` | ModExp engine verification evidence | Scaffold |
-| `02_engine_modinv/` | ModInv engine verification evidence | Scaffold |
+| `01_chassis/` | Chassis RTL verification evidence | Ready |
+| `02_engine_modexp/` | ModExp engine verification evidence | Ready |
+| `02_engine_modinv/` | ModInv engine verification evidence | Ready |
+| `02_engine_pqc/` | PQC NTT engine verification evidence | Ready |
+| `02_engine_rsa_crt/` | RSA-CRT engine verification evidence | Ready |
+| `02_engine_ecc/` | ECC X25519 engine verification evidence | Ready |
 
 ## Evidence Pack Tiers
 

@@ -128,5 +128,34 @@ def verify(
         raise typer.Exit(1)
 
 
+@app.command()
+def verify_token(
+    token: str = typer.Argument(..., help="License token to verify"),
+    public_key_file: str = typer.Option(..., "--public-key", "-p", help="Path to public key PEM file"),
+):
+    """Verify a license token offline using a public key file."""
+    from .license_crypto import load_public_key, verify_token as crypto_verify
+
+    pk_path = Path(public_key_file)
+    if not pk_path.exists():
+        console.print(f"[red]Public key file not found: {public_key_file}[/red]")
+        raise typer.Exit(1)
+
+    pub = load_public_key(pk_path.read_bytes())
+    try:
+        payload = crypto_verify(pub, token)
+    except Exception as e:
+        console.print(f"[red]Verification failed: {e}[/red]")
+        raise typer.Exit(1)
+
+    console.print("[green]Token signature valid[/green]")
+    console.print(f"  Engine:   {payload.get('engine', 'N/A')}")
+    console.print(f"  Customer: {payload.get('customer', 'N/A')}")
+    console.print(f"  Tier:     {payload.get('tier', 'N/A')}")
+    console.print(f"  Issued:   {payload.get('issued_at', 'N/A')}")
+    console.print(f"  Expires:  {payload.get('expires_at', 'never')}")
+    console.print(f"  Key ver:  {payload.get('key_version', 'N/A')}")
+
+
 if __name__ == "__main__":
     app()

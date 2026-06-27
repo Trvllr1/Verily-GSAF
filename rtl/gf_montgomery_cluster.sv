@@ -42,7 +42,6 @@ module gf_montgomery_cluster #(
   logic lane_idle [NUM_MULTIPLIERS];
 
   for (genvar k = 0; k < NUM_MULTIPLIERS; k++) begin : g_lane
-    // reservation table entry k: engine k <-> multiplier k, hard-wired.
     gf_mont_mult #(.WIDTH(WIDTH)) u_mult (
       .clk_i,
       .rst_ni,

@@ -647,6 +647,179 @@ def license_verify(
 
 
 @app.command()
+def serve(
+    port: int = typer.Option(8420, "--port", "-p", help="Server port"),
+    db: str = typer.Option("licenses.db", "--db", "-d", help="SQLite database file"),
+    admin_key: str = typer.Option(..., "--admin-key", "-k", help="Admin API key"),
+):
+    """Start the GSAF license validation server."""
+    import uvicorn
+    from .license_server import app as server_app, configure
+
+    configure(db, admin_key)
+    console.print(f"[bold]Starting GSAF License Server[/bold]")
+    console.print(f"  Port: {port}")
+    console.print(f"  Database: {db}")
+    console.print(f"  Admin API: enabled")
+    console.print(f"\nEndpoints:")
+    console.print(f"  POST /license/validate  — Validate a license token")
+    console.print(f"  POST /license/issue     — Issue a new license")
+    console.print(f"  POST /license/revoke    — Revoke a license")
+    console.print(f"  GET  /license/status    — Server health")
+    console.print(f"  GET  /license/public-key — Public key for offline verification")
+    console.print(f"  POST /keys/rotate       — Rotate signing key")
+    console.print(f"  GET  /keys              — List key versions")
+    console.print(f"  GET  /audit             — Audit log")
+    console.print(f"\nDocs: http://localhost:{port}/docs")
+    uvicorn.run(server_app, host="0.0.0.0", port=port)
+
+
+@app.command()
+def license_issue(
+    server_url: str = typer.Option("http://localhost:8420", "--server", "-s", help="License server URL"),
+    admin_key: str = typer.Option(..., "--admin-key", "-k", help="Admin API key"),
+    engine: str = typer.Option(..., "--engine", "-e", help="Engine name"),
+    customer: str = typer.Option(..., "--customer", "-c", help="Customer name"),
+    tier: str = typer.Option("paid", "--tier", "-t", help="License tier"),
+    expires_at: str = typer.Option(None, "--expires", help="Expiry date (ISO 8601)"),
+):
+    """Issue a new license via the license server."""
+    import urllib.request
+    import json
+
+    payload = json.dumps({
+        "engine": engine,
+        "customer": customer,
+        "tier": tier,
+        "expires_at": expires_at,
+    }).encode()
+
+    req = urllib.request.Request(
+        f"{server_url}/license/issue",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {admin_key}",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req) as resp:
+            result = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        console.print(f"[red]Server error: {e.code}[/red]")
+        console.print(e.read().decode())
+        raise typer.Exit(1)
+
+    console.print(f"[green]License issued[/green]")
+    console.print(f"  License ID: [bold]{result['license_id']}[/bold]")
+    console.print(f"  Key version: {result['key_version']}")
+
+    from pathlib import Path
+    token_file = Path("latest.token")
+    token_file.write_text(result["token"])
+    console.print(f"\n  Token saved to: [bold]{token_file}[/bold]")
+    console.print(f"  Use: python -m gsaf_cli license-validate --token $(cat {token_file})")
+
+
+@app.command()
+def license_revoke(
+    server_url: str = typer.Option("http://localhost:8420", "--server", "-s", help="License server URL"),
+    admin_key: str = typer.Option(..., "--admin-key", "-k", help="Admin API key"),
+    license_id: str = typer.Option(..., "--license-id", "-l", help="License ID to revoke"),
+):
+    """Revoke a license via the license server."""
+    import urllib.request
+    import json
+
+    payload = json.dumps({"license_id": license_id}).encode()
+    req = urllib.request.Request(
+        f"{server_url}/license/revoke",
+        data=payload,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {admin_key}",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req) as resp:
+            result = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        console.print(f"[red]Server error: {e.code}[/red]")
+        console.print(e.read().decode())
+        raise typer.Exit(1)
+
+    console.print(f"[green]License revoked[/green]")
+    console.print(f"  License ID: {result['license_id']}")
+
+
+@app.command()
+def license_validate(
+    server_url: str = typer.Option("http://localhost:8420", "--server", "-s", help="License server URL"),
+    token: str = typer.Option(..., "--token", "-t", help="License token to validate"),
+):
+    """Validate a license token against the server."""
+    import urllib.request
+    import json
+
+    payload = json.dumps({"token": token}).encode()
+    req = urllib.request.Request(
+        f"{server_url}/license/validate",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+    )
+
+    try:
+        with urllib.request.urlopen(req) as resp:
+            result = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = json.loads(e.read())
+        detail = body.get("detail", {})
+        status = detail.get("status", "error") if isinstance(detail, dict) else "error"
+        console.print(f"[red]Status: {status}[/red]")
+        if isinstance(detail, dict):
+            for k, v in detail.items():
+                console.print(f"  {k}: {v}")
+        raise typer.Exit(1)
+
+    console.print(f"[green]Status: valid[/green]")
+    payload_data = result.get("payload", {})
+    for k, v in payload_data.items():
+        console.print(f"  {k}: {v}")
+
+
+@app.command()
+def license_rotate(
+    server_url: str = typer.Option("http://localhost:8420", "--server", "-s", help="License server URL"),
+    admin_key: str = typer.Option(..., "--admin-key", "-k", help="Admin API key"),
+):
+    """Rotate the signing key. Existing licenses remain valid."""
+    import urllib.request
+    import json
+
+    req = urllib.request.Request(
+        f"{server_url}/keys/rotate",
+        data=json.dumps({}).encode(),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {admin_key}",
+        },
+    )
+
+    try:
+        with urllib.request.urlopen(req) as resp:
+            result = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        console.print(f"[red]Server error: {e.code}[/red]")
+        console.print(e.read().decode())
+        raise typer.Exit(1)
+
+    console.print(f"[green]Key rotated[/green]")
+    console.print(f"  New key version: {result['new_key_version']}")
+
+
+@app.command()
 def fpga_build(
     target: str = typer.Option("artix-7", "--target", "-t", help="FPGA target"),
     part: str = typer.Option("xc7a35tcpg236-1", "--part", "-p", help="FPGA part number"),

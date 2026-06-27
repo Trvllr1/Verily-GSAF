@@ -53,33 +53,22 @@ module tb_dyno_rsa_crt (
     .mul_p_i        (mul_p)
   );
 
-  // Simulated modular exponentiation unit: base^exp mod m
-  function automatic logic [WIDTH-1:0] modexp_fn(
-    input logic [WIDTH-1:0] base_i, exp_i, m_i
+  // Simulated modular multiplier: (a * b) mod m
+  function automatic logic [WIDTH-1:0] mulmod_fn(
+    input logic [WIDTH-1:0] a_i, b_i, m_i
   );
-    logic [WIDTH-1:0] result, b;
     logic [2*WIDTH-1:0] product;
     logic [2*WIDTH-1:0] mod_m;
-    logic [2*WIDTH-1:0] mod_result;
+    logic [2*WIDTH-1:0] result;
     if (m_i == 0) return 0;
     mod_m = {{WIDTH{1'b0}}, m_i};
-    result = 1;
-    b = base_i;
-    for (int i = 0; i < WIDTH; i++) begin
-      if (exp_i[i]) begin
-        product = result * b;
-        mod_result = product % mod_m;
-        result = mod_result[WIDTH-1:0];
-      end
-      product = b * b;
-      mod_result = product % mod_m;
-      b = mod_result[WIDTH-1:0];
-    end
-    return result;
+    product = {{WIDTH{1'b0}}, a_i} * {{WIDTH{1'b0}}, b_i};
+    result = product % mod_m;
+    return result[WIDTH-1:0];
   endfunction
 
   assign mul_req_ready = 1'b1;
-  assign mul_p = modexp_fn(mul_a, mul_b, mul_m);
+  assign mul_p = mulmod_fn(mul_a, mul_b, mul_m);
   assign mul_rsp_valid = mul_req_valid;
 
   initial begin

@@ -19,7 +19,19 @@ evidence-pack/
 │   ├── dyno/                     # Engine test harness
 │   ├── formal/                   # Engine formal proofs
 │   └── README.md
-└── 02_engine_modinv/             # ModInv engine evidence
+├── 02_engine_modinv/             # ModInv engine evidence
+│   ├── dyno/
+│   ├── formal/
+│   └── README.md
+├── 02_engine_pqc/                # PQC NTT engine evidence
+│   ├── dyno/
+│   ├── formal/
+│   └── README.md
+├── 02_engine_rsa_crt/            # RSA-CRT engine evidence
+│   ├── dyno/
+│   ├── formal/
+│   └── README.md
+└── 02_engine_ecc/                # ECC X25519 engine evidence
     ├── dyno/
     ├── formal/
     └── README.md
@@ -36,6 +48,16 @@ When a client swaps engines, they swap the `02_engine_*` folder. The `01_chassis
 | Free | `01_chassis/` only | Open-source users |
 | Paid | `01_chassis/` + all `02_engine_*/` | Commercial licensees |
 | Enterprise | Custom dynos + formal proofs | Custom engine development |
+
+## Engine Evidence Summary
+
+| Engine | Golden Model | cocotb Tests | Formal Props | Status |
+|--------|-------------|--------------|--------------|--------|
+| ModExp | Exhaustive moduli, randomized | 4/4 PASS | P1-P5 fabric + engine SVA | Production-ready |
+| ModInv | Exhaustive moduli, randomized | 4/4 PASS | P1-P5 fabric + engine SVA | Production-ready |
+| PQC NTT | FIPS 203/204 verified, schoolbook cross-check | 4/4 PASS | Engine SVA | Production-ready |
+| RSA-CRT | Bellcore detection, large primes | 4/4 PASS | Engine SVA | Production-ready |
+| ECC X25519 | RFC 7748 vectors | 4/4 PASS | Engine SVA | Production-ready |
 
 ## Generating Evidence
 

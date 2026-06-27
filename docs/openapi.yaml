@@ -1,0 +1,425 @@
+openapi: 3.1.0
+info:
+  title: GSAF License Server
+  version: 0.2.0
+  description: |
+    License validation, key rotation, and revocation for GSAF cryptographic IP cores.
+
+    ## Authentication
+    Admin endpoints require a Bearer token in the `Authorization` header:
+    ```
+    Authorization: Bearer <admin-api-key>
+    ```
+
+    ## Token Format
+    License tokens are Ed25519-signed JSON payloads encoded as base64url.
+    Format: `base64url(payload).base64url(signature)`
+
+  contact:
+    name: Verily
+    url: https://verily.com
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:8420
+    description: Local development server
+
+tags:
+  - name: License
+    description: License lifecycle operations
+  - name: Keys
+    description: Cryptographic key management
+  - name: Audit
+    description: Audit trail queries
+
+paths:
+  /license/status:
+    get:
+      tags: [License]
+      summary: Server health check
+      description: Returns server status and current signing key version.
+      operationId: getStatus
+      responses:
+        "200":
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  current_key_version:
+                    type: integer
+                    nullable: true
+                    example: 1
+
+  /license/public-key:
+    get:
+      tags: [License]
+      summary: Get current public key
+      description: |
+        Returns the current Ed25519 public key in PEM format.
+        Use this key to verify license tokens offline.
+      operationId: getPublicKey
+      responses:
+        "200":
+          description: Public key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  public_key:
+                    type: string
+                    description: PEM-encoded Ed25519 public key
+                    example: "-----BEGIN PUBLIC KEY-----\nMC4CAQ...\n-----END PUBLIC KEY-----"
+
+  /license/issue:
+    post:
+      tags: [License]
+      summary: Issue a new license
+      description: |
+        Creates a new Ed25519-signed license token. Requires admin authentication.
+      operationId: issueLicense
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IssueRequest"
+      responses:
+        "200":
+          description: License issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IssueResponse"
+        "403":
+          description: Invalid or missing admin key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /license/validate:
+    post:
+      tags: [License]
+      summary: Validate a license token
+      description: |
+        Validates a license token against the current or historical signing keys.
+        No authentication required — this is the customer-facing endpoint.
+      operationId: validateLicense
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValidateRequest"
+      responses:
+        "200":
+          description: License is valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateResponse"
+        "401":
+          description: Token signature invalid
+        "404":
+          description: Token not found in database
+        "410":
+          description: License revoked or expired
+        "503":
+          description: Signing key no longer available
+
+  /license/revoke:
+    post:
+      tags: [License]
+      summary: Revoke a license
+      description: Revokes a license by ID. Requires admin authentication.
+      operationId: revokeLicense
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevokeRequest"
+      responses:
+        "200":
+          description: License revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: revoked
+                  license_id:
+                    type: string
+                    example: "550e8400-e29b-41d4-a716-446655440000"
+        "403":
+          description: Invalid or missing admin key
+        "404":
+          description: License not found or already revoked
+
+  /license/list:
+    get:
+      tags: [License]
+      summary: List all licenses
+      description: Returns all issued licenses including revoked ones. Requires admin authentication.
+      operationId: listLicenses
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: License list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  licenses:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/LicenseRecord"
+        "403":
+          description: Invalid or missing admin key
+
+  /keys/rotate:
+    post:
+      tags: [Keys]
+      summary: Rotate signing key
+      description: |
+        Generates a new Ed25519 key pair and makes it the current signing key.
+        Previous keys remain valid for verifying existing licenses.
+        Requires admin authentication.
+      operationId: rotateKey
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Key rotated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: rotated
+                  new_key_version:
+                    type: integer
+                    example: 2
+        "403":
+          description: Invalid or missing admin key
+
+  /keys:
+    get:
+      tags: [Keys]
+      summary: List key versions
+      description: Returns all signing key versions with creation timestamps. Requires admin authentication.
+      operationId: listKeys
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Key list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keys:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/KeyRecord"
+        "403":
+          description: Invalid or missing admin key
+
+  /audit:
+    get:
+      tags: [Audit]
+      summary: Get audit log
+      description: Returns recent audit log entries. Requires admin authentication.
+      operationId: getAuditLog
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+          description: Maximum number of entries to return
+      responses:
+        "200":
+          description: Audit entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEntry"
+        "403":
+          description: Invalid or missing admin key
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      description: Admin API key as Bearer token
+
+  schemas:
+    IssueRequest:
+      type: object
+      required: [engine, customer]
+      properties:
+        engine:
+          type: string
+          description: Engine name (e.g., modexp, modinv, pqc, rsa_crt, ecc)
+          example: modexp
+        customer:
+          type: string
+          description: Customer or organization name
+          example: Acme Corp
+        tier:
+          type: string
+          enum: [free, paid, enterprise]
+          default: paid
+          description: License tier
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Expiration timestamp (ISO 8601). Null = no expiration.
+          example: "2027-06-25T00:00:00Z"
+
+    IssueResponse:
+      type: object
+      properties:
+        license_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        token:
+          type: string
+          description: Ed25519-signed license token (base64url.payload.base64url.signature)
+        key_version:
+          type: integer
+          description: Key version used to sign this token
+          example: 1
+
+    ValidateRequest:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+          description: License token to validate
+
+    ValidateResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: valid
+        license_id:
+          type: string
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        payload:
+          type: object
+          properties:
+            engine:
+              type: string
+            customer:
+              type: string
+            tier:
+              type: string
+            issued_at:
+              type: string
+            expires_at:
+              type: string
+              nullable: true
+            key_version:
+              type: integer
+
+    RevokeRequest:
+      type: object
+      required: [license_id]
+      properties:
+        license_id:
+          type: string
+          format: uuid
+          description: UUID of the license to revoke
+
+    LicenseRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        engine:
+          type: string
+        customer:
+          type: string
+        tier:
+          type: string
+        issued_at:
+          type: string
+        expires_at:
+          type: string
+          nullable: true
+        revoked_at:
+          type: string
+          nullable: true
+        key_version:
+          type: integer
+        token:
+          type: string
+
+    KeyRecord:
+      type: object
+      properties:
+        id:
+          type: integer
+        version:
+          type: integer
+        created_at:
+          type: string
+        is_current:
+          type: integer
+          description: 1 if this is the current signing key, 0 otherwise
+
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        action:
+          type: string
+          enum: [issue, validate, revoke, rotate]
+        license_id:
+          type: string
+          nullable: true
+        details:
+          type: string
+          nullable: true
+        timestamp:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        detail:
+          type: string

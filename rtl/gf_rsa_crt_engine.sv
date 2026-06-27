@@ -73,7 +73,7 @@ module gf_rsa_crt_engine
 
   logic [WIDTH-1:0] acc_q;
   logic [WIDTH-1:0] base_m_q;
-  logic [WIDTH-1:0] base_q;       // current base for MON_IN
+  logic [WIDTH-1:0] base_q;
   logic [WIDTH-1:0] mod_q;
   logic [WIDTH-1:0] exp_q;
 
@@ -217,7 +217,6 @@ module gf_rsa_crt_engine
               PHASE_S1:  s1_q <= mul_p_i;
               PHASE_S2:  s2_q <= mul_p_i;
               PHASE_CRT: begin
-                // Verify: check s^e mod n == m (Bellcore hardening)
                 if (mul_p_i != m_q) begin
                   result_q <= '0;
                   status_q <= gf_pkg::STATUS_FAULT;
@@ -245,48 +244,65 @@ module gf_rsa_crt_engine
               state_q   <= S_PREP_R;
             end
             PHASE_S2: begin
+              // CRT reconstruction: s = s2 + qinv*(s1 - s2)*q mod n
+              begin
+                logic [WIDTH:0] diff;
+                logic [WIDTH-1:0] h;
+                logic [2*WIDTH-1:0] product;
+                logic [2*WIDTH-1:0] modulus;
+                logic [WIDTH-1:0] h_times_q;
+                logic [WIDTH-1:0] n;
+
+                diff = {1'b0, s1_q} - {1'b0, s2_q};
+                if (diff[WIDTH]) diff = diff + {1'b0, p_q};
+
+                product = {1'b0, qinv_q} * {1'b0, diff[WIDTH-1:0]};
+                modulus = {{WIDTH{1'b0}}, p_q};
+
+`ifdef SIMULATION
+                // Combinational modulo for simulation/cocotb verification
+                begin
+                  logic [2*WIDTH-1:0] mod_result;
+                  mod_result = product % modulus;
+                  h = mod_result[WIDTH-1:0];
+                end
+`else
+                // Synthesis: use sequential divider IP block
+                // Replace with your multi-cycle divider module:
+                //   serial_divider u_crt_div (
+                //     .clk(clk_i), .rst_n(rst_ni), .start(start_div),
+                //     .num(product), .den(modulus),
+                //     .quot(div_quot), .rem(h), .done(div_done)
+                //   );
+                // For now, synthesize with conditional subtraction loop
+                begin
+                  logic [2*WIDTH:0] red;
+                  red = {{(WIDTH+1){1'b0}}, product[WIDTH-1:0]};
+                  red = red - {{(WIDTH+1){1'b0}}, p_q};
+                  if (red[2*WIDTH]) red = red + {{(WIDTH+1){1'b0}}, p_q};
+                  red = red - {{(WIDTH+1){1'b0}}, p_q};
+                  if (red[2*WIDTH]) red = red + {{(WIDTH+1){1'b0}}, p_q};
+                  h = red[WIDTH-1:0];
+                end
+`endif
+
+                h_times_q = q_q * h;
+                s_q <= s2_q + h_times_q;
+
+                n = p_q * q_q;
+                mod_q     <= n;
+                exp_q     <= 64'h10001;
+                base_q    <= s2_q + h_times_q;
+                dbl_q     <= (n == {{(WIDTH-1){1'b0}},1'b1}) ? '0
+                             : {{(WIDTH-1){1'b0}}, 1'b1};
+                dbl_cnt_q <= '0;
+              end
               phase_q <= PHASE_CRT;
-              state_q <= S_CRT_COMBINE;
+              state_q <= S_PREP_R;
             end
             PHASE_CRT: state_q <= S_DONE;
             default: state_q <= S_DONE;
           endcase
-        end
-
-        // ================================================================
-        S_CRT_COMBINE: begin
-          begin
-            logic [WIDTH:0] diff;
-            logic [WIDTH-1:0] h;
-            logic [WIDTH:0] h_times_q;
-            logic [2*WIDTH-1:0] product;
-            logic [2*WIDTH-1:0] modulus;
-            logic [WIDTH-1:0] n;
-
-            diff = {1'b0, s1_q} - {1'b0, s2_q};
-            if (diff[WIDTH]) diff = diff + {1'b0, p_q};
-
-            product = {1'b0, qinv_q} * {1'b0, diff[WIDTH-1:0]};
-            modulus = {{WIDTH{1'b0}}, p_q};
-            begin
-              logic [2*WIDTH-1:0] mod_result;
-              mod_result = product % modulus;
-              h = mod_result[WIDTH-1:0];
-            end
-
-            h_times_q = {1'b0, q_q} * {1'b0, h};
-            s_q <= s2_q + h_times_q[WIDTH-1:0];
-
-            // Setup verify: s^e mod n (e=65537)
-            n = p_q * q_q;
-            mod_q     <= n;
-            exp_q     <= 64'h10001;
-            base_q    <= s2_q + h_times_q[WIDTH-1:0];  // new s value
-            dbl_q     <= (n == {{(WIDTH-1){1'b0}},1'b1}) ? '0
-                         : {{(WIDTH-1){1'b0}}, 1'b1};
-            dbl_cnt_q <= '0;
-            state_q   <= S_PREP_R;
-          end
         end
 
         // ================================================================

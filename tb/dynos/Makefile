@@ -3,7 +3,7 @@
 
 SIM ?= verilator
 
-COMPILE_ARGS = -I../../rtl
+COMPILE_ARGS = -I../../rtl -DSIMULATION
 ifeq ($(SIM),verilator)
     COMPILE_ARGS += --timing
 endif

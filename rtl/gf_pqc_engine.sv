@@ -65,7 +65,10 @@ module gf_pqc_engine
     S_READ_V,         // Read lower coefficient of butterfly pair
     S_MUL_ISSUE,      // Issue twiddle multiply
     S_MUL_WAIT,       // Wait for multiplier response
-    S_COMBINE,        // Compute U+V and store both results
+    S_COMBINE,        // Forward: compute U+V, U-V and store both results
+    S_COMBINE_INV,    // Inverse: store A[j]=(U+V)%q, issue (U-V)*twiddle
+    S_MUL_WAIT_2,     // Inverse: wait for second multiply response
+    S_WRITE_INV,      // Inverse: write A[j+t] result
     S_DONE
   } state_e;
   state_e state_q;
@@ -81,6 +84,7 @@ module gf_pqc_engine
   logic [WIDTH-1:0]  coeff_a_q;      // read coefficient A
   logic [WIDTH-1:0]  twiddle_q;      // twiddle factor for current butterfly
   logic [WIDTH-1:0]  mod_q;          // modulus register
+  logic [WIDTH-1:0]  uv_diff_q;      // U - V for inverse NTT second multiply
 
   // ─── Twiddle factor ROM (ML-DSA: zeta=1753, q=8380417) ──────────────────
   logic [WIDTH-1:0] twiddle_rom [0:N-1];
@@ -248,6 +252,7 @@ module gf_pqc_engine
       coeff_a_q      <= '0;
       twiddle_q      <= '0;
       mod_q          <= '0;
+      uv_diff_q      <= '0;
       done_cnt_q     <= '0;
       mul_req_valid_o <= 1'b0;
       mul_a_o        <= '0;
@@ -324,37 +329,93 @@ module gf_pqc_engine
         S_COMBINE: begin
           // Combine butterfly results and store
           if (fwd_mode_q) begin
-            // Forward NTT (Cooley-Tukey):
-            //   A[j]   = U + V*twiddle
-            //   A[j+t] = U - V*twiddle
-            coeff_wr_en   <= 1'b1;
-            coeff_wr_addr <= idx_q;
-            coeff_wr_data <= (coeff_a_q + mul_p_i) % mod_q;
+            // Forward NTT (Cooley-Tukey) — conditional subtraction replaces %
+            //   A[j]   = (U + V*twiddle) % q
+            //   A[j+t] = (U - V*twiddle + q) % q
+            begin
+              logic [WIDTH:0] fwd_sum;
+              logic [WIDTH:0] fwd_diff;
+              fwd_sum  = {1'b0, coeff_a_q} + {1'b0, mul_p_i};
+              fwd_diff = {1'b0, coeff_a_q} + {1'b0, mod_q} - {1'b0, mul_p_i};
+              if (fwd_sum  >= {1'b0, mod_q}) fwd_sum  = fwd_sum  - {1'b0, mod_q};
+              if (fwd_diff >= {1'b0, mod_q}) fwd_diff = fwd_diff - {1'b0, mod_q};
+              coeff_wr_en   <= 1'b1;
+              coeff_wr_addr <= idx_q;
+              coeff_wr_data <= fwd_sum[WIDTH-1:0];
+            end
 
-            // Store A[j+t] on next cycle
-            coeff_wr_en   <= 1'b1;
-            coeff_wr_addr <= idx_q + t_q;
-            coeff_wr_data <= (coeff_a_q + mod_q - mul_p_i) % mod_q;
+            // Store A[j+t] — conditional subtraction
+            begin
+              logic [WIDTH:0] fwd_diff2;
+              fwd_diff2 = {1'b0, coeff_a_q} + {1'b0, mod_q} - {1'b0, mul_p_i};
+              if (fwd_diff2 >= {1'b0, mod_q}) fwd_diff2 = fwd_diff2 - {1'b0, mod_q};
+              coeff_wr_en   <= 1'b1;
+              coeff_wr_addr <= idx_q + t_q;
+              coeff_wr_data <= fwd_diff2[WIDTH-1:0];
+            end
           end else begin
             // Inverse NTT (Gentleman-Sande):
-            //   A[j]   = U + V
-            //   A[j+t] = (U - V) * twiddle
-            coeff_wr_en   <= 1'b1;
-            coeff_wr_addr <= idx_q;
-            coeff_wr_data <= (coeff_a_q + v_q) % mod_q;
+            //   A[j]   = (U + V) % q  — conditional subtraction, no multiply
+            //   A[j+t] = (U - V) * twiddle % q  — issue multiply in next state
+            begin
+              logic [WIDTH:0] inv_sum;
+              inv_sum = {1'b0, coeff_a_q} + {1'b0, v_q};
+              if (inv_sum >= {1'b0, mod_q}) inv_sum = inv_sum - {1'b0, mod_q};
+              coeff_wr_en   <= 1'b1;
+              coeff_wr_addr <= idx_q;
+              coeff_wr_data <= inv_sum[WIDTH-1:0];
+            end
 
-            coeff_wr_en   <= 1'b1;
-            coeff_wr_addr <= idx_q + t_q;
-            coeff_wr_data <= mul_p_i;  // (U - V) * twiddle already computed
+            // Hold U-V for second multiply, advance to S_COMBINE_INV
+            uv_diff_q <= coeff_a_q + mod_q - v_q;
+            state_q    <= S_COMBINE_INV;
           end
+
+          // Advance to next butterfly (forward path only; inverse exits above)
+          if (fwd_mode_q) begin
+            idx_q <= idx_q + 1'b1;
+            if (idx_q == LG_N'(N/2 - 1)) begin
+              layer_q <= layer_q + 1'b1;
+              t_q     <= t_q >> 1;
+              idx_q   <= '0;
+              if (layer_q == 4'd7) begin
+                state_q <= S_DONE;
+              end else begin
+                state_q <= S_READ_U;
+              end
+            end else begin
+              state_q <= S_READ_U;
+            end
+          end
+        end
+
+        // ---------------------------------------------------------------
+        S_COMBINE_INV: begin
+          // Issue second multiply: (U - V) * twiddle
+          mul_req_valid_o <= 1'b1;
+          mul_a_o         <= uv_diff_q;
+          mul_b_o         <= twiddle_q;
+          mul_m_o         <= mod_q;
+          state_q         <= S_MUL_WAIT_2;
+        end
+
+        // ---------------------------------------------------------------
+        S_MUL_WAIT_2: begin
+          if (mul_rsp_valid_i) begin
+            state_q <= S_WRITE_INV;
+          end
+        end
+
+        // ---------------------------------------------------------------
+        S_WRITE_INV: begin
+          // Write A[j+t] = (U - V) * twiddle % q (already reduced by multiplier)
+          coeff_wr_en   <= 1'b1;
+          coeff_wr_addr <= idx_q + t_q;
+          coeff_wr_data <= mul_p_i;
 
           // Advance to next butterfly
           idx_q <= idx_q + 1'b1;
-
-          // Check if we've done all butterflies in this layer
-          // Each butterfly pair processes 2 elements, so we iterate N/2 times
           if (idx_q == LG_N'(N/2 - 1)) begin
-            // Layer complete
             layer_q <= layer_q + 1'b1;
             t_q     <= t_q >> 1;
             idx_q   <= '0;
