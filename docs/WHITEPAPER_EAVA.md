@@ -116,9 +116,9 @@ EAVA is a four-phase methodology that transforms hardware IP verification from a
 
 ## 3. EAVA in Practice: GSAF Case Study
 
-### 3.1 The Chassis Verification
+### 3.1 The CryptoKast Chassis Verification
 
-GSAF's chassis (scheduler, transaction table, operand banks, completion queue) was verified using EAVA:
+The CryptoKast chassis (scheduler, transaction table, operand banks, completion queue) was verified using EAVA:
 
 **Explore:** Defined 5 formal properties (P1-P5) covering FIFO overflow, completion integrity, transaction uniqueness, deadlock freedom, and status encoding.
 
@@ -130,11 +130,11 @@ GSAF's chassis (scheduler, transaction table, operand banks, completion queue) w
 
 **Result:** The chassis has been verified against its specification with mathematical proof, not just testing.
 
-### 3.2 The PQC Engine Verification
+### 3.2 The PQC Engine Verification (PiQ / SaV)
 
-The PQC NTT engine was verified using EAVA:
+The PQC NTT engines were verified using EAVA:
 
-**Explore:** Identified the NTT butterfly as a modular multiply-accumulate — the same resource class as the Montgomery multiplier. Mapped FIPS 203/204 requirements.
+**Explore:** Identified the NTT butterfly as a modular multiply-accumulate — the same resource class as the Montgomery multiplier. Mapped FIPS 203/204 requirements for PiQ (ML-KEM) and SaV (ML-DSA).
 
 **Architect:** Created `pqc_ntt_model.py` with schoolbook cross-check. Defined constant-time properties (fixed iteration count, no data-dependent branches).
 
@@ -142,7 +142,7 @@ The PQC NTT engine was verified using EAVA:
 
 **Assure:** Evidence pack includes golden model output, simulation results, and RTL snapshot.
 
-**Result:** PQC engine is verified against FIPS 203/204 with machine-checked evidence.
+**Result:** PiQ and SaV engines are verified against FIPS 203/204 with machine-checked evidence.
 
 ---
 

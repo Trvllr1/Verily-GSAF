@@ -20,7 +20,7 @@ The Federal Information Processing Standard for cryptographic modules requires:
 
 | Requirement | What It Means | GSAF Status |
 |-------------|---------------|-------------|
-| Algorithm certification (CAVP) | Each algorithm must pass NIST test vectors | ModExp/ModInv: ready. PQC: ready. AES/SHA: not implemented |
+| Algorithm certification (CAVP) | Each algorithm must pass NIST test vectors | SAFMex/SAFInv: ready. PiQ/SaV: ready. AES/SHA: not implemented |
 | Module security policy | Documented security claims | Partially documented |
 | Self-tests | Power-on and conditional tests | Golden model self-tests pass |
 | Key management | Lifecycle documentation | License server provides audit trail |
@@ -123,7 +123,7 @@ PQC adds unique certification complexity:
 3. **Performance requirements** — PQC operations are computationally expensive
 4. **Implementation diversity** — Different NTT architectures produce different side-channel profiles
 
-GSAF addresses this by shipping PQC engines with the same verification evidence as classical engines — golden model equivalence, formal properties, and cocotb test results.
+GSAF addresses this by shipping PiQ, SaV, and Compo with the same verification evidence as classical engines (SAFMex, SAFInv, Didym, Oxym) — golden model equivalence, formal properties, and cocotb test results.
 
 ---
 
@@ -145,7 +145,7 @@ GSAF was designed for certification from day one:
 
 ```
 evidence-pack/
-├── 01_chassis/          # Chassis verification evidence
+├── 01_crypto_kast/      # CryptoKast chassis verification evidence
 │   ├── rtl/             # Frozen RTL snapshot
 │   ├── formal/          # SVA proof results
 │   ├── simulation/      # cocotb test results
@@ -164,7 +164,7 @@ Each pack is HMAC-SHA256 signed. Labs can verify integrity without trusting the 
 | Phase | Timeline | Deliverable |
 |-------|----------|-------------|
 | Evidence collection | Now | Golden models, cocotb tests, formal properties |
-| CAVP engagement | Q1 2027 | Algorithm certificates for ModExp/ModInv/ECC |
+| CAVP engagement | Q1 2027 | Algorithm certificates for SAFMex/SAFInv/Oxym |
 | CC documentation | Q2 2027 | Security Target, design docs, test results |
 | CC evaluation | Q3 2027 | EAL2+ certificate |
 | TVLA capture | Q4 2026 | FPGA-based side-channel evidence |

@@ -2,7 +2,7 @@
 
 ## Slide 1: Title
 
-**GreenField Secure Arithmetic Fabric (GSAF)**
+**GSAF — The Fabric**
 *The Formally Verified Post-Quantum Transition Fabric*
 
 Verily | 2026
@@ -28,10 +28,10 @@ GSAF is a **single fabric** with pluggable engines:
 - Verification evidence ships in the box
 
 ```
-Host → AXI4-Lite → Scheduler → [ModExp] [ModInv] [PQC] [RSA-CRT] [ECC]
-                                        ↑
-                              Montgomery Cluster
-                           (static lane reservation)
+Host → AXI4-Lite → CryptoKast → [SAFMex] [SAFInv] [PiQ/SaV] [Didym] [Oxym]
+                                         ↑
+                               Montgomery Cluster
+                            (static lane reservation)
 ```
 
 ---
@@ -40,37 +40,39 @@ Host → AXI4-Lite → Scheduler → [ModExp] [ModInv] [PQC] [RSA-CRT] [ECC]
 
 | Feature | GSAF | Rambus/Synopsys | OpenTitan |
 |---------|------|-----------------|-----------|
-| PQC in same fabric | ✓ ML-KEM/ML-DSA | Separate IP | ✗ |
+| PQC in same fabric | ✓ PiQ + SaV | Separate IP | ✗ |
 | Formal verification | SVA + golden model | Rarely shipped | ✗ |
 | Constant-time proof | Machine-verified | Claimed only | Claimed |
 | Evidence bundle | Signed, tiered | Custom engagement | ✗ |
 | Multi-engine isolation | Static lanes | Varies | N/A |
 
-**Key differentiator:** We don't sell a ModExp accelerator. We sell the **evidence bundle** that cuts certification timelines by quarters.
+**Key differentiator:** We don't sell a SAFMex accelerator. We sell the **evidence bundle** that cuts certification timelines by quarters.
 
 ---
 
 ## Slide 5: What Ships Today
 
-| Component | Status |
-|-----------|--------|
-| RTL (SystemVerilog SV-2017) | Production-intent |
-| 5 crypto engines | All verified |
-| AXI4-Lite interface | Standard bus integration |
-| Golden models (Python) | Self-testing, exhaustive |
-| cocotb testbenches | 4/4 pass per engine |
-| Formal properties | SVA fabric + engine level |
-| Evidence pack system | HMAC-signed, tiered |
-| CLI tooling (GSAF Studio) | 15 commands |
-| License server | Issue/validate/revoke/rotate |
+| Component | Brand | Status |
+|-----------|-------|--------|
+| Chassis | CryptoKast | Production-intent |
+| Modular exponentiation | SAFMex | Verified |
+| Modular inverse | SAFInv | Verified |
+| Post-quantum KEM | PiQ (Piquant) | Verified |
+| Post-quantum DSA | SaV (Savant) | Verified |
+| RSA-CRT | Didym | Verified |
+| ECC X25519 | Oxym | Verified |
+| Combined KEM+DSA | Compo | Verified |
+| License server | — | Issue/validate/revoke/rotate |
+| CLI tooling | GSAF Studio | 15 commands |
 
 ---
 
 ## Slide 6: PQC Readiness
 
-- **ML-KEM (Kyber):** FIPS 203 NTT, q=3329, zeta=17
-- **ML-DSA (Dilithium):** FIPS 204 NTT, q=8380417, zeta=1753
-- **Same butterfly engine** for both standards
+- **PiQ (Piquant):** ML-KEM NTT — FIPS 203, q=3329, zeta=17
+- **SaV (Savant):** ML-DSA NTT — FIPS 204, q=8380417, zeta=1753
+- **Compo:** Combined KEM+DSA engine for customers needing both
+- **Same butterfly architecture** across PiQ, SaV, Compo
 - **Golden model verified** against schoolbook negacyclic convolution
 - **Constant-time by construction** — NTT has fixed iteration count
 
@@ -78,22 +80,31 @@ Host → AXI4-Lite → Scheduler → [ModExp] [ModInv] [PQC] [RSA-CRT] [ECC]
 
 ## Slide 7: Security Countermeasures
 
-| Threat | Countermeasure | Proof |
-|--------|---------------|-------|
-| DPA (power analysis) | Exponent blinding (64-bit) | Golden model invariant |
-| Fault injection | Sparse FSM encoding + range checks | STATUS_FAULT never silent |
-| Timing leakage | Fixed-latency operations | Formal SVA properties |
-| Operand tampering | Static bank isolation | No cross-transaction leakage |
+| Threat | Countermeasure | Engine |
+|--------|---------------|--------|
+| DPA (power analysis) | Exponent blinding (64-bit) | SAFMex, Didym |
+| Bellcore fault attack | Verify-after-sign | Didym |
+| Timing leakage | Fixed-latency operations | All engines |
+| Operand tampering | Static bank isolation | CryptoKast |
+| Fault injection | Sparse FSM + range checks | SAFMex, SAFInv |
 
 ---
 
-## Slide 8: Pricing
+## Slide 8: Pricing — À La Carte
 
 | Product | Price | Includes |
 |---------|-------|----------|
-| Chassis + Core Engines | $75K-$150K + 1.5% royalty | RTL + golden models + evidence pack |
-| + PQC Engine | $150K-$300K + 2% royalty | ML-KEM/ML-DSA NTT |
-| + Enterprise (Custom) | $300K-$500K + 2.5% royalty | Custom engines + obfuscated RTL |
+| CryptoKast (base) | $75K-$150K + 1.5% royalty | Chassis + interface + evidence |
+| + SAFMex | Individual or bundle | Modular exponentiation |
+| + SAFInv | Individual or bundle | Modular inverse |
+| + PiQ | Individual or bundle | ML-KEM NTT |
+| + SaV | Individual or bundle | ML-DSA NTT |
+| + Compo | Individual or bundle | KEM+DSA combined |
+| + Didym | Individual or bundle | RSA-CRT |
+| + Oxym | Individual or bundle | ECC X25519 |
+| Classical bundle | $150K-$300K + 2% royalty | CryptoKast + SAFMex + SAFInv |
+| PQC bundle | $150K-$300K + 2% royalty | CryptoKast + PiQ + SaV |
+| Full fabric | $300K-$500K + 2.5% royalty | CryptoKast + all engines |
 | Certification Pack | $100K-$200K one-time | FIPS 140-3 evidence + CC docs |
 
 ---
@@ -114,7 +125,7 @@ Host → AXI4-Lite → Scheduler → [ModExp] [ModInv] [PQC] [RSA-CRT] [ECC]
 
 1. **NDA execution** — receive RTL source + evidence pack
 2. **Technical evaluation** — 30-day access to GSAF Studio
-3. **Design-in decision** — license agreement + royalty terms
+3. **Design-in decision** — pick your engines, license agreement
 4. **Integration support** — 40 hours included
 
 **Contact:** _______________

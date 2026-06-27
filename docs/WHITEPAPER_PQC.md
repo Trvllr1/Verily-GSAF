@@ -76,7 +76,7 @@ Software PQC is straightforward — update libraries. Hardware PQC requires:
 | OpenTitan | ✗ Not included | N/A | ✗ |
 | CEVA | ✗ Not included | N/A | ✗ |
 
-**Key insight:** No other vendor offers PQC and classical crypto in a **single, verified fabric**. GSAF is 1-2 years ahead.
+**Key insight:** No other vendor offers PQC and classical crypto in a **single, verified fabric**. GSAF — The Fabric — is 1-2 years ahead.
 
 ### 2.2 Why "Separate IP" Fails
 
@@ -106,12 +106,12 @@ GSAF's PQC engine uses the Number-Theoretic Transform (NTT), which is:
 
 ## 3. GSAF's PQC Architecture
 
-### 3.1 The NTT Engine
+### 3.1 The NTT Engine (PiQ / SaV / Compo)
 
 ```
                     ┌─────────────────────┐
-                    │   gf_pqc_engine      │
-                    │                      │
+                    │   PiQ / SaV / Compo │
+                    │   (gf_pqc_engine)   │
  cmd ──────────────►│  State Machine       │
                     │  ┌────────────────┐  │
                     │  │ S_IDLE         │  │
@@ -180,7 +180,7 @@ GSAF's PQC golden model (`pqc_ntt_model.py`) verifies:
           ┌────────────────────┼────────────────────┐
           │                    │                    │
    ┌──────▼──────┐    ┌──────▼──────┐    ┌──────▼──────┐
-   │   ModExp    │    │   ModInv    │    │   PQC NTT   │
+   │   SAFMex    │    │   SAFInv    │    │   PiQ/SaV   │
    │  (classical)│    │  (classical)│    │  (post-quantum)│
    └──────┬──────┘    └──────┬──────┘    └──────┬──────┘
           │                    │                    │
@@ -190,13 +190,13 @@ GSAF's PQC golden model (`pqc_ntt_model.py`) verifies:
    └──────────────────────────────────────────────────────┘
 ```
 
-**Key design principle:** Engines are **pluggable** via the `gf_engine_if.sv` interface. Adding PQC doesn't modify the chassis — it adds an engine to a reserved slot.
+**Key design principle:** Engines are **pluggable** via the `gf_engine_if.sv` interface. Adding PiQ, SaV, or Compo doesn't modify the CryptoKast chassis — it adds an engine to a reserved slot.
 
 ### 4.3 Resource Sharing
 
 | Resource | Classical Use | PQC Use | Sharing Mechanism |
 |----------|--------------|---------|-------------------|
-| Montgomery multiplier | ModExp, ModInv | NTT butterfly | Reserved lane per engine |
+| Montgomery multiplier | SAFMex, SAFInv | PiQ/SaV NTT butterfly | Reserved lane per engine |
 | Operand banks | A, B, M operands | Polynomial coefficients | Static bank ownership |
 | Transaction table | Classical transactions | PQC transforms | Same table, different opcodes |
 | Completion queue | Classical results | NTT results | Same queue, same credit system |
@@ -207,11 +207,12 @@ GSAF's PQC golden model (`pqc_ntt_model.py`) verifies:
 
 ### 5.1 Feature Comparison
 
-| Feature | GSAF | Rambus (roadmap) | Synopsys (roadmap) |
-|---------|------|-----------------|-------------------|
-| ML-KEM (Kyber) | ✅ Shipped | ⚠️ 2027 | ⚠️ 2027 |
-| ML-DSA (Dilithium) | ✅ Shipped | ⚠️ 2027 | ⚠️ 2027 |
-| Same fabric as classical | ✅ | ✗ Separate | ✗ Separate |
+| Feature | GSAF (PiQ/SaV/Compo) | Rambus (roadmap) | Synopsys (roadmap) |
+|---------|----------------------|-----------------|-------------------|
+| ML-KEM (Kyber) | ✅ PiQ shipped | ⚠️ 2027 | ⚠️ 2027 |
+| ML-DSA (Dilithium) | ✅ SaV shipped | ⚠️ 2027 | ⚠️ 2027 |
+| KEM+DSA combined | ✅ Compo shipped | ✗ | ✗ |
+| Same fabric as classical | ✅ CryptoKast | ✗ Separate | ✗ Separate |
 | Golden model verified | ✅ | TBD | TBD |
 | Formal properties | ✅ | TBD | TBD |
 | cocotb tests | ✅ 4/4 PASS | TBD | TBD |
@@ -247,8 +248,9 @@ GSAF's PQC golden model (`pqc_ntt_model.py`) verifies:
 
 | Product | Price | Attach Rate |
 |---------|-------|-------------|
-| Classical-only license | $75K-$150K | Base |
-| + PQC engine | $150K-$300K | 60% of customers |
+| Classical bundle (CryptoKast + SAFMex + SAFInv) | $150K-$300K | Base |
+| + PiQ or SaV engine | $150K-$300K | 60% of customers |
+| + Compo (KEM+DSA) | $150K-$300K | 40% of PQC customers |
 | + Certification pack | $100K-$200K | 40% of customers |
 | Custom PQC NRE | $50K-$100K | 20% of customers |
 
@@ -270,7 +272,7 @@ GSAF's PQC golden model (`pqc_ntt_model.py`) verifies:
 
 The PQC transition is not a future event — it's happening now. Every secure element vendor faces a 2027 deadline to ship PQC-capable silicon. The traditional approach of separate IP blocks for classical and PQC fails the hybrid requirement.
 
-GSAF solves this with a single, verified fabric that runs both classical and PQC algorithms through the same chassis, with the same security model, and the same evidence bundle. The PQC engines are shipped, verified, and tested — not on a roadmap.
+GSAF solves this with CryptoKast — a single, verified fabric that runs both classical and PQC algorithms through the same chassis, with the same security model, and the same evidence bundle. The PQC engines (PiQ, SaV, Compo) are shipped, verified, and tested — not on a roadmap.
 
 The window for PQC-ready IP is closing. Vendors who act now will capture the transition market. Those who wait will face 12-18 month delays while competitors ship.
 
