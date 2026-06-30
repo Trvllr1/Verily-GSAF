@@ -52,3 +52,5 @@ sim_build/
 __pycache__/
 *.pyc
 licenses/
+latest.token
+licenses.db
